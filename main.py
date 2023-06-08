@@ -8,9 +8,11 @@ import json
 import pytz
 import os
 import requests
+import time
 
 # StableDiffAPI Url
 urlstdapi = "https://stablediffusionapi.com/api/v4/dreambooth"
+url_fetch = "https://stablediffusionapi.com/api/v4/dreambooth/fetch"
 
 # Set the timezone to Thailand
 timezone = pytz.timezone("Asia/Bangkok")
@@ -64,16 +66,18 @@ def handle_message(event):
   # Retrieve the user's message and convert it to lowercase
   user_message = event.message.text.lower()
   reply_message = ""
-  
+
   # Check the user's message and set the appropriate reply message
   if user_message == "hi":
     reply_message = "Good morning"
 
   elif user_message.startswith('@curset'):
-    json_data = (master_users_collection.find_one({'user_id': event.source.user_id},{"main_model": 1}))
+    json_data = (master_users_collection.find_one(
+      {'user_id': event.source.user_id}, {"main_model": 1}))
     main_model = json_data['main_model']
-    reply_message = "Your current model is : "+main_model
+    reply_message = "Your current model is : " + main_model
 
+  #set main_model
   elif user_message.startswith('@setmodel'):
     filter = {'user_id': event.source.user_id}
     newvalues = {
@@ -84,15 +88,31 @@ def handle_message(event):
     master_users_collection.update_one(filter, newvalues)
     reply_message = "Accept new model! : " + user_message
 
+  #set lora_model
+  elif user_message.startswith('@setlora'):
+    filter = {'user_id': event.source.user_id}
+    newvalues = {
+      "$set": {
+        'lora_model': user_message.replace("@setlora ", ""),
+      }
+    }
+    master_users_collection.update_one(filter, newvalues)
+    reply_message = "Accept new model! : " + user_message
+
   elif user_message == "no":
     reply_message = "Why?"
 
   elif user_message.startswith('/img'):
-    
+
     # Set main_model from master_users  to be in json payload
-    json_data = (master_users_collection.find_one({'user_id': event.source.user_id},
-    {"main_model": 1}))
+    json_data = (master_users_collection.find_one(
+      {'user_id': event.source.user_id}, {"main_model": 1}))
     main_model = json_data['main_model']
+
+    # Set lora model
+    json_data1 = (master_users_collection.find_one(
+      {'user_id': event.source.user_id}, {"lora_model": 1}))
+    lora_model = json_data1['lora_model']
 
     # check for negative prompt
     index = user_message.find("--no")
@@ -104,11 +124,11 @@ def handle_message(event):
 
     if start_index != -1:
       if end_index != -1:
-          positive_prompt = user_message[start_index:end_index].strip()
+        positive_prompt = user_message[start_index:end_index].strip()
       else:
-          positive_prompt = user_message[start_index:].strip()
+        positive_prompt = user_message[start_index:].strip()
     else:
-        positive_prompt = None
+      positive_prompt = None
 
     # Begin parameter for payload
     payload = json.dumps({
@@ -129,33 +149,79 @@ def handle_message(event):
       "self_attention": "no",
       "upscale": "no",
       "embeddings_model": "",
-      "lora_model": "",
+      "lora_model": lora_model,
       "scheduler": "UniPCMultistepScheduler",
       "webhook": None,
       "track_id": None
     })
-
 
     headers = {'Content-Type': 'application/json'}
 
     response = requests.post(urlstdapi, headers=headers, data=payload)
 
     if response.ok:
-      jsonResponse = response.json()
-      image_gen_records_collection.insert_one({
-        'timestamp':
-        timestamp,
-        'json_response':
-        str(jsonResponse),
-        'user_id':
-        event.source.user_id
-      })
-      output_url = jsonResponse['output'][0]
-      reply_message = output_url
+      # check status of ok response success or processing?
+      data = response.json()
+      output_status = data['status']
+      output_id = data['id']
+
+      # if success
+      if output_status == "success":
+        jsonResponse = response.json()
+        image_gen_records_collection.insert_one({
+          'timestamp':
+          timestamp,
+          'json_response':
+          str(jsonResponse),
+          'user_id':
+          event.source.user_id,
+          'track_id':
+          output_id
+        })
+        output_url = jsonResponse['output'][0]
+        reply_message = output_url
+
+      #if else, possible to be processing
+      elif output_status == "processing":
+        jsonResponse = response.json()
+        fetch_status = jsonResponse['status']
+
+        # Keep record to check start time of processing
+        image_gen_records_collection.insert_one({
+          'timestamp':
+          timestamp,
+          'json_response':
+          str(jsonResponse),
+          'user_id':
+          event.source.user_id
+        })
+
+        #whil loop until fetch_status <> processing
+        while fetch_status == "processing":
+          #wait until 60 second, then fetch data
+          time.sleep(60)
+          payload = json.dumps({"key": my_secret4, "request_id": output_id})
+          headers = {'Content-Type': 'application/json'}
+
+          #Keep response value
+          fetch_response = requests.request("POST",
+                                            url_fetch,
+                                            headers=headers,
+                                            data=payload)
+
+          #parse json
+          json_fetch_reponse = fetch_response.json()
+
+          fetch_status = json_fetch_reponse['status']
+
+        #select json portion
+        output_fetch_url = json_fetch_reponse['output'][0]
+
+        #return final result
+        reply_message = output_fetch_url
 
     else:
-      output_status = jsonResponse['status']
-      reply_message = output_status
+      reply_message = "Error"
       image_gen_records_collection.insert_one({
         'timestamp':
         timestamp,
@@ -164,7 +230,7 @@ def handle_message(event):
         'user_id':
         event.source.user_id
       })
-      
+
   else:
     reply_message = "I don't know"
 
