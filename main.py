@@ -64,42 +64,57 @@ def handle_message(event):
   # Retrieve the user's message and convert it to lowercase
   user_message = event.message.text.lower()
   reply_message = ""
-  selected_main_model = ""
+  
   # Check the user's message and set the appropriate reply message
   if user_message == "hi":
     reply_message = "Good morning"
-    
+
   elif user_message.startswith('@curset'):
-    reply_message = str(master_users_collection.find_one({'user_id': event.source.user_id},{"main_model": 1}))
-    
-    
+    json_data = (master_users_collection.find_one({'user_id': event.source.user_id},{"main_model": 1}))
+    main_model = json_data['main_model']
+    reply_message = "Your current model is : "+main_model
+
+  elif user_message.startswith('@setmodel'):
+    filter = {'user_id': event.source.user_id}
+    newvalues = {
+      "$set": {
+        'main_model': user_message.replace("@setmodel ", ""),
+      }
+    }
+    master_users_collection.update_one(filter, newvalues)
+    reply_message = "Accept new model! : " + user_message
+
   elif user_message == "no":
     reply_message = "Why?"
-    
-  elif user_message.startswith('@setmodel'):
-    filter = {'user_id' : event.source.user_id}
-    newvalues = {"$set":{'main_model':user_message.replace("@setmodel ", ""),}} 
-    master_users_collection.update_one(filter, newvalues)
-    reply_message = "Accept new model!"
-    
+
   elif user_message.startswith('/img'):
-    
+    json_data = (master_users_collection.find_one({'user_id': event.source.user_id},
+    {"main_model": 1}))
+    main_model = json_data['main_model']
     payload = json.dumps({
       "key": my_secret4,
+      "model_id": main_model,
       "prompt": user_message.replace("/img", ""),
       "negative_prompt": None,
       "width": "512",
       "height": "512",
       "samples": "1",
-      "num_inference_steps": "20",
+      "num_inference_steps": "30",
+      "safety_checker": "no",
+      "enhance_prompt": "no",
       "seed": None,
       "guidance_scale": 7.5,
-      "safety_checker": "yes",
       "multi_lingual": "no",
       "panorama": "no",
       "self_attention": "no",
       "upscale": "no",
-      "embeddings_model": "embeddings_model_id",
+      "embeddings_model": None,
+      "lora_model": None,
+      "tomesd": "yes",
+      "use_karras_sigmas": "yes",
+      "vae": None,
+      "lora_strength": None,
+      "scheduler": "UniPCMultistepScheduler",
       "webhook": None,
       "track_id": None
     })
