@@ -10,7 +10,7 @@ import os
 import requests
 
 # StableDiffAPI Url
-urlstdapi = "https://stablediffusionapi.com/api/v3/text2img"
+urlstdapi = "https://stablediffusionapi.com/api/v4/dreambooth"
 
 # Set the timezone to Thailand
 timezone = pytz.timezone("Asia/Bangkok")
@@ -88,36 +88,53 @@ def handle_message(event):
     reply_message = "Why?"
 
   elif user_message.startswith('/img'):
+    
+    # Set main_model from master_users  to be in json payload
     json_data = (master_users_collection.find_one({'user_id': event.source.user_id},
     {"main_model": 1}))
     main_model = json_data['main_model']
+
+    # check for negative prompt
+    index = user_message.find("--no")
+    negative_prompt = user_message[index + len("--no"):].strip()
+
+    # check for positive prompt
+    start_index = user_message.find("/img") + len("/img")
+    end_index = user_message.find("--no")
+
+    if start_index != -1:
+      if end_index != -1:
+          positive_prompt = user_message[start_index:end_index].strip()
+      else:
+          positive_prompt = user_message[start_index:].strip()
+    else:
+        positive_prompt = None
+
+    # Begin parameter for payload
     payload = json.dumps({
       "key": my_secret4,
       "model_id": main_model,
-      "prompt": user_message.replace("/img", ""),
-      "negative_prompt": None,
+      "prompt": positive_prompt,
+      "negative_prompt": negative_prompt,
       "width": "512",
       "height": "512",
       "samples": "1",
-      "num_inference_steps": "30",
+      "num_inference_steps": "31",
       "safety_checker": "no",
       "enhance_prompt": "no",
-      "seed": None,
+      "seed": 0,
       "guidance_scale": 7.5,
       "multi_lingual": "no",
       "panorama": "no",
       "self_attention": "no",
       "upscale": "no",
-      "embeddings_model": None,
-      "lora_model": None,
-      "tomesd": "yes",
-      "use_karras_sigmas": "yes",
-      "vae": None,
-      "lora_strength": None,
+      "embeddings_model": "",
+      "lora_model": "",
       "scheduler": "UniPCMultistepScheduler",
       "webhook": None,
       "track_id": None
     })
+
 
     headers = {'Content-Type': 'application/json'}
 
@@ -137,7 +154,17 @@ def handle_message(event):
       reply_message = output_url
 
     else:
-      reply_message = "Error: Failed to generate image"
+      output_status = jsonResponse['status']
+      reply_message = output_status
+      image_gen_records_collection.insert_one({
+        'timestamp':
+        timestamp,
+        'json_response':
+        str(jsonResponse),
+        'user_id':
+        event.source.user_id
+      })
+      
   else:
     reply_message = "I don't know"
 
