@@ -64,15 +64,26 @@ def handle_message(event):
   # Retrieve the user's message and convert it to lowercase
   user_message = event.message.text.lower()
   reply_message = ""
-
+  selected_main_model = ""
   # Check the user's message and set the appropriate reply message
   if user_message == "hi":
     reply_message = "Good morning"
-  elif user_message == "yes":
-    reply_message = "OK"
+    
+  elif user_message.startswith('@curset'):
+    reply_message = str(master_users_collection.find_one({'user_id': event.source.user_id},{"main_model": 1}))
+    
+    
   elif user_message == "no":
     reply_message = "Why?"
+    
+  elif user_message.startswith('@setmodel'):
+    filter = {'user_id' : event.source.user_id}
+    newvalues = {"$set":{'main_model':user_message.replace("@setmodel ", ""),}} 
+    master_users_collection.update_one(filter, newvalues)
+    reply_message = "Accept new model!"
+    
   elif user_message.startswith('/img'):
+    
     payload = json.dumps({
       "key": my_secret4,
       "prompt": user_message.replace("/img", ""),
