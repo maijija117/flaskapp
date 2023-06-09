@@ -113,8 +113,12 @@ def handle_message(event):
     json_data1 = (master_users_collection.find_one(
       {'user_id': event.source.user_id}, {"lora_model": 1}))
     lora_model = json_data1['lora_model']
+    
+    # If lora in Mongo equal - this mean None for json payload
     if lora_model == "-" :
       lora_model = None
+
+    # If not just select normal lora
     else:
       lora_model = json_data1['lora_model']
     
@@ -241,7 +245,7 @@ def handle_message(event):
 
   # Save the message to MongoDB
   save_message(event.source.user_id, user_message)
-
+  
   # Send the reply message back to the user
   line_bot_api.reply_message(event.reply_token,
                              TextSendMessage(text=reply_message))
