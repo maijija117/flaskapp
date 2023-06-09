@@ -1,7 +1,7 @@
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError, LineBotApiError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, StickerSendMessage
 from pymongo import MongoClient
 from datetime import datetime
 import json
@@ -101,6 +101,9 @@ def handle_message(event):
 
   elif user_message == "no":
     reply_message = "Why?"
+
+  elif user_message == "555":
+    reply_message = None
 
   elif user_message.startswith('/img'):
 
@@ -247,8 +250,14 @@ def handle_message(event):
   save_message(event.source.user_id, user_message)
   
   # Send the reply message back to the user
-  line_bot_api.reply_message(event.reply_token,
+  if reply_message !=None :
+    line_bot_api.reply_message(event.reply_token,
                              TextSendMessage(text=reply_message))
+  else:
+    sticker_message = StickerSendMessage(package_id='1',sticker_id='1'
+	)
+  line_bot_api.reply_message(event.reply_token, sticker_message)
+  
 
 
 def save_message(user_id, message):
