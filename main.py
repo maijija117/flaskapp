@@ -113,6 +113,11 @@ def handle_message(event):
     json_data1 = (master_users_collection.find_one(
       {'user_id': event.source.user_id}, {"lora_model": 1}))
     lora_model = json_data1['lora_model']
+    if lora_model == "-" :
+      lora_model = None
+    else:
+      lora_model = json_data1['lora_model']
+    
 
     # check for negative prompt
     index = user_message.find("--no")
