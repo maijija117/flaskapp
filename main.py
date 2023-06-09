@@ -72,10 +72,10 @@ def handle_message(event):
     reply_message = "Good morning"
 
   elif user_message.startswith('@curset'):
-    json_data = (master_users_collection.find_one(
-      {'user_id': event.source.user_id}, {"main_model": 1}))
+    json_data = master_users_collection.find_one({'user_id': event.source.user_id}, {"main_model": 1,"lora_model": 1})
     main_model = json_data['main_model']
-    reply_message = "Your current model is : " + main_model
+    lora_model = json_data['lora_model']
+    reply_message = "🤖Model : " + main_model + "\n️🎚️model : " + lora_model
 
   #set main_model
   elif user_message.startswith('@setmodel'):
@@ -116,15 +116,14 @@ def handle_message(event):
     json_data1 = (master_users_collection.find_one(
       {'user_id': event.source.user_id}, {"lora_model": 1}))
     lora_model = json_data1['lora_model']
-    
+
     # If lora in Mongo equal - this mean None for json payload
-    if lora_model == "-" :
+    if lora_model == "-":
       lora_model = None
 
     # If not just select normal lora
     else:
       lora_model = json_data1['lora_model']
-    
 
     # check for negative prompt
     index = user_message.find("--no")
@@ -174,8 +173,9 @@ def handle_message(event):
     if response.ok:
       # check status of ok response success or processing?
       data = response.json()
+      print (data)
       output_status = data['status']
-      output_id = data['id']
+      output_id = data.get('id')
 
       # if success
       if output_status == "success":
@@ -248,16 +248,14 @@ def handle_message(event):
 
   # Save the message to MongoDB
   save_message(event.source.user_id, user_message)
-  
+
   # Send the reply message back to the user
-  if reply_message !=None :
+  if reply_message != None:
     line_bot_api.reply_message(event.reply_token,
-                             TextSendMessage(text=reply_message))
+                               TextSendMessage(text=reply_message))
   else:
-    sticker_message = StickerSendMessage(package_id='1',sticker_id='1'
-	)
-  line_bot_api.reply_message(event.reply_token, sticker_message)
-  
+    sticker_message = StickerSendMessage(package_id='1', sticker_id='1')
+    line_bot_api.reply_message(event.reply_token, sticker_message)
 
 
 def save_message(user_id, message):
