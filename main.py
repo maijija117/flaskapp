@@ -24,6 +24,11 @@ my_secret3 = os.environ['MONGO_DB_CONNECTION']
 my_secret4 = os.environ['STD_API_KEY']
 headers_for_line = {'Content-Type': 'application/json','Authorization':'Bearer'+" "+my_secret}
 
+###variable for imagegen
+user_message =''
+var_self_attention =''
+
+
 app = Flask(__name__)
 
 line_bot_api = LineBotApi(my_secret)
@@ -129,6 +134,14 @@ def handle_message(event):
         reply_message_to_user("Upscale complete! : " + output_url)
     
   elif user_message.startswith('/img'):
+    #check for sefl attention
+    if user_message.find("@hf") > -1:
+      var_self_attention = "yes"
+      #when chagne global variable, there must be new local var to save new value for global var
+      x = user_message.replace("@hf","")
+      user_message = x
+    else: 
+      var_self_attention = "no"
 
     # Set main_model from master_users  to be in json payload
     json_data = (master_users_collection.find_one(
@@ -148,10 +161,12 @@ def handle_message(event):
     else:
       lora_model = json_data1['lora_model']
 
+
+
     # check for negative prompt
     index = user_message.find("--no ")
     negative_prompt = user_message[index + len("--no"):].strip()
-
+    
     # check for positive prompt
     start_index = user_message.find("/img ") + len("/img")
     end_index = user_message.find("--no ")
@@ -164,6 +179,7 @@ def handle_message(event):
     else:
       positive_prompt = None
 
+      
     # Begin parameter for payload
     payload = json.dumps({
       "key": my_secret4,
@@ -180,7 +196,7 @@ def handle_message(event):
       "guidance_scale": 7.5,
       "multi_lingual": "no",
       "panorama": "no",
-      "self_attention": "no",
+      "self_attention": var_self_attention,
       "upscale": "no",
       "embeddings_model": "",
       "lora_model": lora_model,
@@ -350,7 +366,9 @@ def save_message(user_id, message):
     master_users_collection.insert_one({
       'user_id': user_id,
       'display_name': display_name,
-      'timestamp': timestamp
+      'timestamp': timestamp,
+      'main_model': "midjourney",
+      'lora_model': "-"
     })
     
   # Insert the document into the messages collection
