@@ -88,6 +88,62 @@ def handle_message(event):
   elif user_message == "no":
     reply_message_to_user("why")
 
+  elif user_message.startswith('@callmodel'):
+    payload = json.dumps({
+          "replyToken": replytoken,
+          "messages": [
+            {
+  "type": "template",
+  "altText": "this is a carousel template",
+  "template": {
+    "type": "carousel",
+    "columns": [
+      {
+        "thumbnailImageUrl": "https://example.com/bot/images/item1.jpg",
+        "imageBackgroundColor": "#FFFFFF",
+        "title": "this is menu",
+        "text": "description",
+        "defaultAction": {
+          "type": "uri",
+          "label": "View detail",
+          "uri": "http://example.com/page/123"
+        },
+        "actions": [
+          {
+            "type": "message",
+            "label": "Buy",
+            "text": "action=buy&itemid=111"
+          }
+        ]
+      },
+      {
+        "thumbnailImageUrl": "https://example.com/bot/images/item2.jpg",
+        "imageBackgroundColor": "#000000",
+        "title": "this is menu",
+        "text": "description",
+        "defaultAction": {
+          "type": "uri",
+          "label": "View detail",
+          "uri": "http://example.com/page/222"
+        },
+        "actions": [
+          {
+            "type": "message",
+            "label": "Buy",
+            "text": "action=buy&itemid=222"
+          }
+        ]
+      }
+    ],
+    "imageAspectRatio": "rectangle",
+    "imageSize": "cover"
+  }
+}
+          ]
+        }
+                        )
+    requests.post('https://api.line.me/v2/bot/message/reply', headers=headers_for_line, data=payload)
+
   elif user_message.startswith('@check'):
     json_data = image_gen_records_collection.find_one({'track_id': int(user_message.replace("@check ",""))}, {"track_id":1,"json_response": 1})
     print(user_message.replace("@check ",""))
@@ -312,8 +368,14 @@ def handle_message(event):
                   {
                     "type": "message",
                     "label": "Seed_No : "+str(output_seed),
-                    "text": "@check "+str(output_id) }]}}]})
-
+                    "text": "@check "+str(output_id) 
+                  }
+                ]
+              }
+            }
+          ]
+        }
+        )
         #send image to line user
         requests.post('https://api.line.me/v2/bot/message/reply', headers=headers_for_line, data=payload)
         
