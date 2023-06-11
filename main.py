@@ -46,6 +46,7 @@ db = client['line_bot_database']
 messages_collection = db['messages']
 master_users_collection = db['master_users']
 image_gen_records_collection = db['image_gen_records_collection']
+model_master_collection= db["model_master"]
 
 # Get the current time in Thailand timezone
 current_time = datetime.now(timezone)
@@ -88,6 +89,44 @@ def handle_message(event):
   elif user_message == "no":
     reply_message_to_user("why")
 
+  elif user_message.startswith('@callmodel2'):
+    query_condition = {
+      "GPT_type_mainModel": "Photography"  # Modify the field and value as per your query condition
+  }
+    print(1)
+  # Query data from MongoDB based on the condition
+    query_result = model_master_collection.find(query_condition)
+    print(2)
+  # Create an empty array to store the data
+    data = []
+    print(3)
+  # Iterate over the query result and insert into the data array
+    for item in query_result:
+      thumbnail_image_url = item["GPT_model_image_link"]
+      new_member = {
+          "thumbnailImageUrl": thumbnail_image_url,
+          "imageBackgroundColor": "#FFFFFF",
+          "title": "this is menu",
+          "text": "description",
+          "defaultAction": {
+              "type": "uri",
+              "label": "View detail",
+              "uri": "http://example.com/page/123"
+          },
+          "actions": [
+              {
+                  "type": "message",
+                  "label": "Buy",
+                  "text": "action=buy&itemid=111"
+              }
+          ]
+      }
+      data.append(new_member)
+  
+      print(data)
+      x = len(data)
+      print(x)
+  
   elif user_message.startswith('@callmodel'):
     payload = json.dumps({
           "replyToken": replytoken,
