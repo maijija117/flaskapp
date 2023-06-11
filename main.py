@@ -122,10 +122,24 @@ def handle_message(event):
           ]
       }
       data.append(new_member)
-  
-      print(data)
-      x = len(data)
-      print(x)
+
+      payload = json.dumps({
+        "replyToken": replytoken,
+        "messages": [
+        {
+            "type": "template",
+            "altText": "this is a carousel template",
+            "template": {
+                "type": "carousel",
+                "columns": data,
+                "imageAspectRatio": "rectangle",
+                "imageSize": "cover"
+            }
+        }
+    ]
+})
+    print(4)
+    requests.post('https://api.line.me/v2/bot/message/reply', headers=headers_for_line, data=payload)
   
   elif user_message.startswith('@callmodel'):
     payload = json.dumps({
