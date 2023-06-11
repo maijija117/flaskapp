@@ -9,6 +9,7 @@ import pytz
 import os
 import requests
 import time
+import re
 
 # StableDiffAPI Url
 urlstdapi = "https://stablediffusionapi.com/api/v4/dreambooth"
@@ -29,6 +30,7 @@ user_message =''
 var_self_attention =''
 var_width = 512
 var_height = 512
+var_num_inference_steps = 31
 
 
 app = Flask(__name__)
@@ -163,7 +165,22 @@ def handle_message(event):
       user_message = x
     else: 
       var_width = 512
-    
+      
+    #check for step
+    if user_message.find("--step") > -1:
+      #check where step begin
+      x = user_message.index("--step")
+      #read the whole step (step with number)
+      y = user_message[x:]
+      #assign variable for number after --step
+      var_num_inference_steps = re.search(r'\d+', y).group()
+      #delete --stepxx from user message
+      z = user_message.replace(y,"")
+      #user message after delete --stepxx
+      user_message = z
+    else: 
+      var_num_inference_steps = 31
+
     # Set main_model from master_users  to be in json payload
     json_data = (master_users_collection.find_one(
       {'user_id': event.source.user_id}, {"main_model": 1}))
@@ -207,7 +224,7 @@ def handle_message(event):
       "width": var_width,
       "height": var_height,
       "samples": "1",
-      "num_inference_steps": "31",
+      "num_inference_steps": var_num_inference_steps,
       "safety_checker": "no",
       "enhance_prompt": "no",
       "seed": 0,
@@ -394,6 +411,10 @@ def save_message(user_id, message):
 
 def reply_message_to_user(reply_message):
   line_bot_api.reply_message(replytoken,TextSendMessage(text=reply_message))
+
+def reply_processing_message(reply_message):
+  line_bot_api.push_message(event.source.user_id, TextSendMessage(text=reply_message))
+
 
 if __name__ == '__main__':
   app.run(host='0.0.0.0', port=81)
