@@ -187,21 +187,28 @@ def handle_message(event):
           output_id
         })
         output_url = jsonResponse['output'][0]
+        #output_W = jsonResponse['W']
+        #output_H = jsonResponse['H']
+        output_model = jsonResponse['meta']['model_id']
+        output_W = jsonResponse['meta']['W']
+        output_H = jsonResponse['meta']['H']
+        output_seed = jsonResponse['meta']['seed']
+        output_steps = jsonResponse['meta']['steps']
         payload = json.dumps(
         {
           "replyToken": replytoken,
           "messages": [
             {
               "type": "template",
-              "altText": "New generated image arrived!",
+              "altText": "New image arrived!",
               "template": {
                 "type": "buttons",
                 "thumbnailImageUrl": output_url,
                 "imageAspectRatio": "square",
                 "imageSize": "cover",
                 "imageBackgroundColor": "#FFFFFF",
-                "title": "Generate success!",
-                "text": "Please see seed below",
+                "title": "Seed_No : "+str(output_seed),
+                "text": "Steps : "+str(output_steps),
                 "defaultAction": {
                   "type": "uri",
                   "label": "test",
@@ -209,14 +216,21 @@ def handle_message(event):
                 },
                 "actions": [
                   {
+                    "type": "message",
+                    "label": "Upscale",
+                    "text": "@upscale "+output_url
+                  },
+                  {
                     "type": "uri",
-                    "label": "test",
+                    "label": "Size : " + str(output_W)+" * "+str(output_H),
                     "uri": output_url
                   },
                   {
                     "type": "uri",
-                    "label": "test",
+                    "label": "Model : " + output_model,
                     "uri": output_url}]}}]})
+
+        #send image to line user
         requests.post('https://api.line.me/v2/bot/message/reply', headers=headers_for_line, data=payload)
         
       #if else, possible to be processing
