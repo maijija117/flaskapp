@@ -272,6 +272,7 @@ def handle_message(event):
         output_H = jsonResponse['meta']['H']
         output_seed = jsonResponse['meta']['seed']
         output_steps = jsonResponse['meta']['steps']
+        output_lora = jsonResponse['meta']['lora']
         payload = json.dumps(
         {
           "replyToken": replytoken,
@@ -285,7 +286,7 @@ def handle_message(event):
                 "imageAspectRatio": "square",
                 "imageSize": "cover",
                 "imageBackgroundColor": "#FFFFFF",
-                "title": "Seed_No : "+str(output_seed),
+                "title": "Model : " + output_model,
                 "text": "Steps : "+str(output_steps) +" Id : "+str(output_id),
                 "defaultAction": {
                   "type": "uri",
@@ -293,6 +294,11 @@ def handle_message(event):
                   "uri": output_url
                 },
                 "actions": [
+                  {
+                    "type": "uri",
+                    "label": "L : "+output_lora,
+                    "uri": output_url
+                  },
                   {
                     "type": "message",
                     "label": "Upscale",
@@ -305,7 +311,7 @@ def handle_message(event):
                   },
                   {
                     "type": "uri",
-                    "label": "Model : " + output_model,
+                    "label": "Seed_No : "+str(output_seed),
                     "uri": output_url}]}}]})
 
         #send image to line user
@@ -313,9 +319,10 @@ def handle_message(event):
         
       #if else, possible to be processing
       elif output_status == "processing":
+        reply_message_to_user("We are processing, please wait.")
         jsonResponse = response.json()
         fetch_status = jsonResponse['status']
-
+        
         # Keep record to check start time of processing
         image_gen_records_collection.insert_one({
           'timestamp':
@@ -351,9 +358,9 @@ def handle_message(event):
         reply_message = output_fetch_url + " : " + str(output_id)
         
         #exit from while then return final result
-        line_bot_api.reply_message(event.reply_token,
-        TextSendMessage(text=reply_message))
+        reply_processing_message(reply_message)
 
+      #When error send raw json from stdapi to user
       else:
         jsonResponse = response.json()
         image_gen_records_collection.insert_one({
