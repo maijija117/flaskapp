@@ -89,7 +89,7 @@ def handle_message(event):
   elif user_message == "no":
     reply_message_to_user("why")
 
-  elif user_message.startswith('@callmodel2'):
+  elif user_message.startswith('@callmopho'):
     query_condition = {
       "GPT_type_mainModel": "Photography"  # Modify the field and value as per your query condition
   }
@@ -103,10 +103,13 @@ def handle_message(event):
   # Iterate over the query result and insert into the data array
     for item in query_result:
       thumbnail_image_url = item["GPT_model_image_link"]
+      GPT_CIVmodel_name =item["GPT_CIVmodel_name"]
+      Title = item["Title"]
+      GPT_sample_prompt =item["GPT_sample_prompt"]
       new_member = {
           "thumbnailImageUrl": thumbnail_image_url,
           "imageBackgroundColor": "#FFFFFF",
-          "title": "this is menu",
+          "title": GPT_CIVmodel_name,
           "text": "description",
           "defaultAction": {
               "type": "uri",
@@ -116,8 +119,13 @@ def handle_message(event):
           "actions": [
               {
                   "type": "message",
-                  "label": "Buy",
-                  "text": "action=buy&itemid=111"
+                  "label": "Set Model",
+                  "text": "@setmodel "+Title
+              },
+              {
+                  "type": "message",
+                  "label": "Sample Prompt",
+                  "text": GPT_sample_prompt
               }
           ]
       }
@@ -132,7 +140,7 @@ def handle_message(event):
             "template": {
                 "type": "carousel",
                 "columns": data,
-                "imageAspectRatio": "rectangle",
+                "imageAspectRatio": "square",
                 "imageSize": "cover"
             }
         }
@@ -140,6 +148,186 @@ def handle_message(event):
 })
     print(4)
     requests.post('https://api.line.me/v2/bot/message/reply', headers=headers_for_line, data=payload)
+
+  elif user_message.startswith('@callmogen'):
+    query_condition = {
+      "GPT_type_mainModel": "General"  # Modify the field and value as per your query condition
+  }
+    print(1)
+  # Query data from MongoDB based on the condition
+    query_result = model_master_collection.find(query_condition)
+    print(2)
+  # Create an empty array to store the data
+    data = []
+    print(3)
+  # Iterate over the query result and insert into the data array
+    for item in query_result:
+      thumbnail_image_url = item["GPT_model_image_link"]
+      GPT_CIVmodel_name =item["GPT_CIVmodel_name"]
+      Title = item["Title"]
+      GPT_sample_prompt =item["GPT_sample_prompt"]
+      new_member = {
+          "thumbnailImageUrl": thumbnail_image_url,
+          "imageBackgroundColor": "#FFFFFF",
+          "title": GPT_CIVmodel_name,
+          "text": "description",
+          "defaultAction": {
+              "type": "uri",
+              "label": "View detail",
+              "uri": "http://example.com/page/123"
+          },
+          "actions": [
+              {
+                  "type": "message",
+                  "label": "Set Model",
+                  "text": "@setmodel "+Title
+              },
+              {
+                  "type": "message",
+                  "label": "Sample Prompt",
+                  "text": GPT_sample_prompt
+              }
+          ]
+      }
+      data.append(new_member)
+
+      payload = json.dumps({
+        "replyToken": replytoken,
+        "messages": [
+        {
+            "type": "template",
+            "altText": "this is a carousel template",
+            "template": {
+                "type": "carousel",
+                "columns": data,
+                "imageAspectRatio": "square",
+                "imageSize": "cover"
+            }
+        }
+    ]
+})
+    print(4)
+    requests.post('https://api.line.me/v2/bot/message/reply', headers=headers_for_line, data=payload)  
+
+  elif user_message.startswith('@callmocar'):
+    query_condition = {
+      "GPT_type_mainModel": "Cartoon"  # Modify the field and value as per your query condition
+  }
+    print(1)
+  # Query data from MongoDB based on the condition
+    query_result = model_master_collection.find(query_condition)
+    print(2)
+  # Create an empty array to store the data
+    data = []
+    print(3)
+  # Iterate over the query result and insert into the data array
+    for item in query_result:
+      thumbnail_image_url = item["GPT_model_image_link"]
+      GPT_CIVmodel_name =item["GPT_CIVmodel_name"]
+      Title = item["Title"]
+      GPT_sample_prompt =item["GPT_sample_prompt"]
+      new_member = {
+          "thumbnailImageUrl": thumbnail_image_url,
+          "imageBackgroundColor": "#FFFFFF",
+          "title": GPT_CIVmodel_name,
+          "text": "description",
+          "defaultAction": {
+              "type": "uri",
+              "label": "View detail",
+              "uri": "http://example.com/page/123"
+          },
+          "actions": [
+              {
+                  "type": "message",
+                  "label": "Set Model",
+                  "text": "@setmodel "+Title
+              },
+              {
+                  "type": "message",
+                  "label": "Sample Prompt",
+                  "text": GPT_sample_prompt
+              }
+          ]
+      }
+      data.append(new_member)
+
+      payload = json.dumps({
+        "replyToken": replytoken,
+        "messages": [
+        {
+            "type": "template",
+            "altText": "this is a carousel template",
+            "template": {
+                "type": "carousel",
+                "columns": data,
+                "imageAspectRatio": "square",
+                "imageSize": "cover"
+            }
+        }
+    ]
+})
+    print(4)
+    requests.post('https://api.line.me/v2/bot/message/reply', headers=headers_for_line, data=payload) 
+
+  elif user_message.startswith('@callmomsc'):
+    query_condition = {
+      "GPT_type_mainModel": "Msc."  # Modify the field and value as per your query condition
+  }
+    print(1)
+  # Query data from MongoDB based on the condition
+    query_result = model_master_collection.find(query_condition)
+    print(2)
+  # Create an empty array to store the data
+    data = []
+    print(3)
+  # Iterate over the query result and insert into the data array
+    for item in query_result:
+      thumbnail_image_url = item["GPT_model_image_link"]
+      GPT_CIVmodel_name =item["GPT_CIVmodel_name"]
+      Title = item["Title"]
+      GPT_sample_prompt =item["GPT_sample_prompt"]
+      new_member = {
+          "thumbnailImageUrl": thumbnail_image_url,
+          "imageBackgroundColor": "#FFFFFF",
+          "title": GPT_CIVmodel_name,
+          "text": "description",
+          "defaultAction": {
+              "type": "uri",
+              "label": "View detail",
+              "uri": "http://example.com/page/123"
+          },
+          "actions": [
+              {
+                  "type": "message",
+                  "label": "Set Model",
+                  "text": "@setmodel "+Title
+              },
+              {
+                  "type": "message",
+                  "label": "Sample Prompt",
+                  "text": GPT_sample_prompt
+              }
+          ]
+      }
+      data.append(new_member)
+
+      payload = json.dumps({
+        "replyToken": replytoken,
+        "messages": [
+        {
+            "type": "template",
+            "altText": "this is a carousel template",
+            "template": {
+                "type": "carousel",
+                "columns": data,
+                "imageAspectRatio": "square",
+                "imageSize": "cover"
+            }
+        }
+    ]
+})
+    print(4)
+    requests.post('https://api.line.me/v2/bot/message/reply', headers=headers_for_line, data=payload)  
   
   elif user_message.startswith('@callmodel'):
     payload = json.dumps({
