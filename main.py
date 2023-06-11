@@ -27,6 +27,8 @@ headers_for_line = {'Content-Type': 'application/json','Authorization':'Bearer'+
 ###variable for imagegen
 user_message =''
 var_self_attention =''
+var_width = 512
+var_height = 512
 
 
 app = Flask(__name__)
@@ -134,6 +136,7 @@ def handle_message(event):
         reply_message_to_user("Upscale complete! : " + output_url)
     
   elif user_message.startswith('/img'):
+    
     #check for sefl attention
     if user_message.find("@hf") > -1:
       var_self_attention = "yes"
@@ -143,6 +146,24 @@ def handle_message(event):
     else: 
       var_self_attention = "no"
 
+    #check for portrait ratio
+    if user_message.find("--arp") > -1:
+      var_height = 768
+      #when chagne global variable, there must be new local var to save new value for global var
+      x = user_message.replace("--arp","")
+      user_message = x
+    else: 
+      var_height = 512
+      
+    #check for landscape ratio
+    if user_message.find("--arl") > -1:
+      var_width = 768
+      #when chagne global variable, there must be new local var to save new value for global var
+      x = user_message.replace("--arl","")
+      user_message = x
+    else: 
+      var_width = 512
+    
     # Set main_model from master_users  to be in json payload
     json_data = (master_users_collection.find_one(
       {'user_id': event.source.user_id}, {"main_model": 1}))
@@ -161,8 +182,6 @@ def handle_message(event):
     else:
       lora_model = json_data1['lora_model']
 
-
-
     # check for negative prompt
     index = user_message.find("--no ")
     negative_prompt = user_message[index + len("--no"):].strip()
@@ -179,15 +198,14 @@ def handle_message(event):
     else:
       positive_prompt = None
 
-      
     # Begin parameter for payload
     payload = json.dumps({
       "key": my_secret4,
       "model_id": main_model,
       "prompt": positive_prompt,
       "negative_prompt": negative_prompt,
-      "width": "512",
-      "height": "512",
+      "width": var_width,
+      "height": var_height,
       "samples": "1",
       "num_inference_steps": "31",
       "safety_checker": "no",
