@@ -310,9 +310,9 @@ def handle_message(event):
                     "uri": output_url
                   },
                   {
-                    "type": "uri",
+                    "type": "message",
                     "label": "Seed_No : "+str(output_seed),
-                    "uri": output_url}]}}]})
+                    "text": "@check "+str(output_id) }]}}]})
 
         #send image to line user
         requests.post('https://api.line.me/v2/bot/message/reply', headers=headers_for_line, data=payload)
