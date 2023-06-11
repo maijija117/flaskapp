@@ -13,6 +13,7 @@ import time
 # StableDiffAPI Url
 urlstdapi = "https://stablediffusionapi.com/api/v4/dreambooth"
 url_fetch = "https://stablediffusionapi.com/api/v4/dreambooth/fetch"
+url_upscale = "https://stablediffusionapi.com/api/v3/super_resolution"
 
 # Set the timezone to Thailand
 timezone = pytz.timezone("Asia/Bangkok")
@@ -90,7 +91,6 @@ def handle_message(event):
     master_users_collection.update_one(filter, newvalues)
     reply_message_to_user("Accept new model! : " + user_message)
 
-
   elif user_message.startswith('@setlora'):
     filter = {'user_id': event.source.user_id}
     newvalues = {
@@ -100,6 +100,23 @@ def handle_message(event):
     }
     master_users_collection.update_one(filter, newvalues)
     reply_message_to_user("Accept new model! : " + user_message)
+
+  elif user_message.startswith('@upscale'):
+      payload = json.dumps({
+     "key": my_secret4,
+     "url": user_message.replace("@upscale ", ""),
+     "scale": 3,
+     "webhook": None
+    })
+      headers = {'Content-Type': 'application/json'}
+      response = requests.post(url_upscale, headers=headers, data=payload)
+    
+      if response.ok:
+      # check status of ok response success or processing?
+        data = response.json()
+        print (data)
+        output_url = data['output']
+        reply_message_to_user("Upscale complete! : " + output_url)
     
   elif user_message.startswith('/img'):
 
@@ -208,7 +225,7 @@ def handle_message(event):
                 "imageSize": "cover",
                 "imageBackgroundColor": "#FFFFFF",
                 "title": "Seed_No : "+str(output_seed),
-                "text": "Steps : "+str(output_steps),
+                "text": "Steps : "+str(output_steps) +" Id : "+str(output_id),
                 "defaultAction": {
                   "type": "uri",
                   "label": "test",
@@ -218,7 +235,7 @@ def handle_message(event):
                   {
                     "type": "message",
                     "label": "Upscale",
-                    "text": "@upscale "+output_url
+                    "text": "@upscale " + output_url
                   },
                   {
                     "type": "uri",
