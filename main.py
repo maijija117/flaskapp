@@ -122,12 +122,12 @@ def handle_message(event):
       lora_model = json_data1['lora_model']
 
     # check for negative prompt
-    index = user_message.find("--no")
+    index = user_message.find("--no ")
     negative_prompt = user_message[index + len("--no"):].strip()
 
     # check for positive prompt
-    start_index = user_message.find("/img") + len("/img")
-    end_index = user_message.find("--no")
+    start_index = user_message.find("/img ") + len("/img")
+    end_index = user_message.find("--no ")
 
     if start_index != -1:
       if end_index != -1:
@@ -314,6 +314,7 @@ def save_message(user_id, message):
     
   # Insert the document into the messages collection
   messages_collection.insert_one(message_doc)
+
 
 def reply_message_to_user(reply_message):
   line_bot_api.reply_message(replytoken,TextSendMessage(text=reply_message))
