@@ -62,14 +62,15 @@ def callback():
 
 
 # Define a handler for the MessageEvent
-@handler.add(MessageEvent, message=TextMessage)
+@handler.add(MessageEvent,message=TextMessage)
 def handle_message(event):
   # Retrieve the user's message and convert it to lowercase
   user_message = event.message.text.lower()
-  reply_message = ""
+  global reply_message
   global replytoken 
   global payload
   replytoken = event.reply_token
+
   # Check the user's message and set the appropriate reply message
   if user_message == "hi":
     reply_message_to_user("Good morning")
@@ -257,8 +258,8 @@ def handle_message(event):
         #exit from while then return final result
         reply_message = output_fetch_url
         
-      #exit from while then return final result
-      line_bot_api.reply_message(event.reply_token,
+        #exit from while then return final result
+        line_bot_api.reply_message(event.reply_token,
         TextSendMessage(text=reply_message))
 
     else:
