@@ -319,9 +319,9 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token,
         TextSendMessage(text=reply_message))
 
-    else:
-      reply_message = "Error"
-      image_gen_records_collection.insert_one({
+      else:
+        jsonResponse = response.json()
+        image_gen_records_collection.insert_one({
         'timestamp':
         timestamp,
         'json_response':
@@ -330,8 +330,7 @@ def handle_message(event):
         event.source.user_id
       })
       #send reply to user
-      line_bot_api.reply_message(event.reply_token,
-        TextSendMessage(text=reply_message))
+        reply_message_to_user(str(jsonResponse))
 
   else:
     reply_message = "I don't know"
