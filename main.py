@@ -79,6 +79,16 @@ def handle_message(event):
   elif user_message == "no":
     reply_message_to_user("why")
 
+  elif user_message.startswith('@check'):
+    json_data = image_gen_records_collection.find_one({'track_id': int(user_message.replace("@check ",""))}, {"track_id":1,"json_response": 1})
+    print(user_message.replace("@check ",""))
+    if json_data is not None:
+        track_id = json_data['track_id']
+        json_response = json_data['json_response']
+        reply_message_to_user(str(track_id) + str(json_response))
+    else:
+        reply_message_to_user("No record found with the specified track_id")
+
   elif user_message.startswith('@curset'):
     json_data = master_users_collection.find_one({'user_id': event.source.user_id},             {"main_model":1,"lora_model": 1})
     main_model = json_data['main_model']
@@ -287,7 +297,7 @@ def handle_message(event):
         output_fetch_url = json_fetch_reponse['output'][0]
 
         #exit from while then return final result
-        reply_message = output_fetch_url
+        reply_message = output_fetch_url + " : " + str(output_id)
         
         #exit from while then return final result
         line_bot_api.reply_message(event.reply_token,
