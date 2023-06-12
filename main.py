@@ -23,15 +23,18 @@ my_secret = os.environ['LINE_ACCESS_TOKEN']
 my_secret2 = os.environ['LINE_SECRET']
 my_secret3 = os.environ['MONGO_DB_CONNECTION']
 my_secret4 = os.environ['STD_API_KEY']
-headers_for_line = {'Content-Type': 'application/json','Authorization':'Bearer'+" "+my_secret}
+headers_for_line = {
+  'Content-Type': 'application/json',
+  'Authorization': 'Bearer' + " " + my_secret
+}
 
 ###variable for imagegen
-user_message =''
-var_self_attention =''
+user_message = ''
+var_self_attention = ''
 var_width = 512
 var_height = 512
 var_num_inference_steps = 31
-
+var_seed = 0
 
 app = Flask(__name__)
 
@@ -46,7 +49,7 @@ db = client['line_bot_database']
 messages_collection = db['messages']
 master_users_collection = db['master_users']
 image_gen_records_collection = db['image_gen_records_collection']
-model_master_collection= db["model_master"]
+model_master_collection = db["model_master"]
 
 # Get the current time in Thailand timezone
 current_time = datetime.now(timezone)
@@ -73,17 +76,20 @@ def callback():
 
 
 # Define a handler for the MessageEvent
-@handler.add(MessageEvent,message=TextMessage)
+@handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
   # Retrieve the user's message and convert it to lowercase
   user_message = event.message.text.lower()
   global reply_message
-  global replytoken 
+  global replytoken
   global payload
   replytoken = event.reply_token
+  global lineUserId  # to save user_id in lineUserId var for sendding push message
+  lineUserId = event.source.user_id
 
   # Check the user's message and set the appropriate reply message
   if user_message == "hi":
+    print(replytoken+" :1st "+lineUserId)
     reply_message_to_user("Good morning")
 
   elif user_message == "no":
@@ -91,319 +97,355 @@ def handle_message(event):
 
   elif user_message.startswith('@callmopho'):
     query_condition = {
-      "GPT_type_mainModel": "Photography"  # Modify the field and value as per your query condition
-  }
+      "GPT_type_mainModel":
+      "Photography"  # Modify the field and value as per your query condition
+    }
     print(1)
-  # Query data from MongoDB based on the condition
+    # Query data from MongoDB based on the condition
     query_result = model_master_collection.find(query_condition)
     print(2)
-  # Create an empty array to store the data
+    # Create an empty array to store the data
     data = []
     print(3)
-  # Iterate over the query result and insert into the data array
+    # Iterate over the query result and insert into the data array
     for item in query_result:
       thumbnail_image_url = item["GPT_model_image_link"]
-      GPT_CIVmodel_name =item["GPT_CIVmodel_name"]
+      GPT_CIVmodel_name = item["GPT_CIVmodel_name"]
       Title = item["Title"]
-      GPT_sample_prompt =item["GPT_sample_prompt"]
+      GPT_sample_prompt = item["GPT_sample_prompt"]
       new_member = {
-          "thumbnailImageUrl": thumbnail_image_url,
-          "imageBackgroundColor": "#FFFFFF",
-          "title": GPT_CIVmodel_name,
-          "text": "description",
-          "defaultAction": {
-              "type": "uri",
-              "label": "View detail",
-              "uri": "http://example.com/page/123"
-          },
-          "actions": [
-              {
-                  "type": "message",
-                  "label": "Set Model",
-                  "text": "@setmodel "+Title
-              },
-              {
-                  "type": "message",
-                  "label": "Sample Prompt",
-                  "text": GPT_sample_prompt
-              }
-          ]
-      }
-      data.append(new_member)
-
-      payload = json.dumps({
-        "replyToken": replytoken,
-        "messages": [
-        {
-            "type": "template",
-            "altText": "this is a carousel template",
-            "template": {
-                "type": "carousel",
-                "columns": data,
-                "imageAspectRatio": "square",
-                "imageSize": "cover"
-            }
-        }
-    ]
-})
-    print(4)
-    requests.post('https://api.line.me/v2/bot/message/reply', headers=headers_for_line, data=payload)
-
-  elif user_message.startswith('@callmogen'):
-    query_condition = {
-      "GPT_type_mainModel": "General"  # Modify the field and value as per your query condition
-  }
-    print(1)
-  # Query data from MongoDB based on the condition
-    query_result = model_master_collection.find(query_condition)
-    print(2)
-  # Create an empty array to store the data
-    data = []
-    print(3)
-  # Iterate over the query result and insert into the data array
-    for item in query_result:
-      thumbnail_image_url = item["GPT_model_image_link"]
-      GPT_CIVmodel_name =item["GPT_CIVmodel_name"]
-      Title = item["Title"]
-      GPT_sample_prompt =item["GPT_sample_prompt"]
-      new_member = {
-          "thumbnailImageUrl": thumbnail_image_url,
-          "imageBackgroundColor": "#FFFFFF",
-          "title": GPT_CIVmodel_name,
-          "text": "description",
-          "defaultAction": {
-              "type": "uri",
-              "label": "View detail",
-              "uri": "http://example.com/page/123"
-          },
-          "actions": [
-              {
-                  "type": "message",
-                  "label": "Set Model",
-                  "text": "@setmodel "+Title
-              },
-              {
-                  "type": "message",
-                  "label": "Sample Prompt",
-                  "text": GPT_sample_prompt
-              }
-          ]
-      }
-      data.append(new_member)
-
-      payload = json.dumps({
-        "replyToken": replytoken,
-        "messages": [
-        {
-            "type": "template",
-            "altText": "this is a carousel template",
-            "template": {
-                "type": "carousel",
-                "columns": data,
-                "imageAspectRatio": "square",
-                "imageSize": "cover"
-            }
-        }
-    ]
-})
-    print(4)
-    requests.post('https://api.line.me/v2/bot/message/reply', headers=headers_for_line, data=payload)  
-
-  elif user_message.startswith('@callmocar'):
-    query_condition = {
-      "GPT_type_mainModel": "Cartoon"  # Modify the field and value as per your query condition
-  }
-    print(1)
-  # Query data from MongoDB based on the condition
-    query_result = model_master_collection.find(query_condition)
-    print(2)
-  # Create an empty array to store the data
-    data = []
-    print(3)
-  # Iterate over the query result and insert into the data array
-    for item in query_result:
-      thumbnail_image_url = item["GPT_model_image_link"]
-      GPT_CIVmodel_name =item["GPT_CIVmodel_name"]
-      Title = item["Title"]
-      GPT_sample_prompt =item["GPT_sample_prompt"]
-      new_member = {
-          "thumbnailImageUrl": thumbnail_image_url,
-          "imageBackgroundColor": "#FFFFFF",
-          "title": GPT_CIVmodel_name,
-          "text": "description",
-          "defaultAction": {
-              "type": "uri",
-              "label": "View detail",
-              "uri": "http://example.com/page/123"
-          },
-          "actions": [
-              {
-                  "type": "message",
-                  "label": "Set Model",
-                  "text": "@setmodel "+Title
-              },
-              {
-                  "type": "message",
-                  "label": "Sample Prompt",
-                  "text": GPT_sample_prompt
-              }
-          ]
-      }
-      data.append(new_member)
-
-      payload = json.dumps({
-        "replyToken": replytoken,
-        "messages": [
-        {
-            "type": "template",
-            "altText": "this is a carousel template",
-            "template": {
-                "type": "carousel",
-                "columns": data,
-                "imageAspectRatio": "square",
-                "imageSize": "cover"
-            }
-        }
-    ]
-})
-    print(4)
-    requests.post('https://api.line.me/v2/bot/message/reply', headers=headers_for_line, data=payload) 
-
-  elif user_message.startswith('@callmomsc'):
-    query_condition = {
-      "GPT_type_mainModel": "Msc."  # Modify the field and value as per your query condition
-  }
-    print(1)
-  # Query data from MongoDB based on the condition
-    query_result = model_master_collection.find(query_condition)
-    print(2)
-  # Create an empty array to store the data
-    data = []
-    print(3)
-  # Iterate over the query result and insert into the data array
-    for item in query_result:
-      thumbnail_image_url = item["GPT_model_image_link"]
-      GPT_CIVmodel_name =item["GPT_CIVmodel_name"]
-      Title = item["Title"]
-      GPT_sample_prompt =item["GPT_sample_prompt"]
-      new_member = {
-          "thumbnailImageUrl": thumbnail_image_url,
-          "imageBackgroundColor": "#FFFFFF",
-          "title": GPT_CIVmodel_name,
-          "text": "description",
-          "defaultAction": {
-              "type": "uri",
-              "label": "View detail",
-              "uri": "http://example.com/page/123"
-          },
-          "actions": [
-              {
-                  "type": "message",
-                  "label": "Set Model",
-                  "text": "@setmodel "+Title
-              },
-              {
-                  "type": "message",
-                  "label": "Sample Prompt",
-                  "text": GPT_sample_prompt
-              }
-          ]
-      }
-      data.append(new_member)
-
-      payload = json.dumps({
-        "replyToken": replytoken,
-        "messages": [
-        {
-            "type": "template",
-            "altText": "this is a carousel template",
-            "template": {
-                "type": "carousel",
-                "columns": data,
-                "imageAspectRatio": "square",
-                "imageSize": "cover"
-            }
-        }
-    ]
-})
-    print(4)
-    requests.post('https://api.line.me/v2/bot/message/reply', headers=headers_for_line, data=payload)  
-  
-  elif user_message.startswith('@callmodel'):
-    payload = json.dumps({
-          "replyToken": replytoken,
-          "messages": [
-            {
-  "type": "template",
-  "altText": "this is a carousel template",
-  "template": {
-    "type": "carousel",
-    "columns": [
-      {
-        "thumbnailImageUrl": "https://example.com/bot/images/item1.jpg",
-        "imageBackgroundColor": "#FFFFFF",
-        "title": "this is menu",
-        "text": "description",
+        "thumbnailImageUrl":
+        thumbnail_image_url,
+        "imageBackgroundColor":
+        "#FFFFFF",
+        "title":
+        GPT_CIVmodel_name,
+        "text":
+        "description",
         "defaultAction": {
           "type": "uri",
           "label": "View detail",
           "uri": "http://example.com/page/123"
         },
-        "actions": [
-          {
-            "type": "message",
-            "label": "Buy",
-            "text": "action=buy&itemid=111"
+        "actions": [{
+          "type": "message",
+          "label": "Set Model",
+          "text": "@setmodel " + Title
+        }, {
+          "type": "message",
+          "label": "Sample Prompt",
+          "text": GPT_sample_prompt
+        }]
+      }
+      data.append(new_member)
+
+      payload = json.dumps({
+        "replyToken":
+        replytoken,
+        "messages": [{
+          "type": "template",
+          "altText": "this is a carousel template",
+          "template": {
+            "type": "carousel",
+            "columns": data,
+            "imageAspectRatio": "square",
+            "imageSize": "cover"
           }
-        ]
-      },
-      {
-        "thumbnailImageUrl": "https://example.com/bot/images/item2.jpg",
-        "imageBackgroundColor": "#000000",
-        "title": "this is menu",
-        "text": "description",
+        }]
+      })
+    print(4)
+    requests.post('https://api.line.me/v2/bot/message/reply',
+                  headers=headers_for_line,
+                  data=payload)
+
+  elif user_message.startswith('@callmogen'):
+    query_condition = {
+      "GPT_type_mainModel":
+      "General"  # Modify the field and value as per your query condition
+    }
+    print(1)
+    # Query data from MongoDB based on the condition
+    query_result = model_master_collection.find(query_condition)
+    print(2)
+    # Create an empty array to store the data
+    data = []
+    print(3)
+    # Iterate over the query result and insert into the data array
+    for item in query_result:
+      thumbnail_image_url = item["GPT_model_image_link"]
+      GPT_CIVmodel_name = item["GPT_CIVmodel_name"]
+      Title = item["Title"]
+      GPT_sample_prompt = item["GPT_sample_prompt"]
+      new_member = {
+        "thumbnailImageUrl":
+        thumbnail_image_url,
+        "imageBackgroundColor":
+        "#FFFFFF",
+        "title":
+        GPT_CIVmodel_name,
+        "text":
+        "description",
         "defaultAction": {
           "type": "uri",
           "label": "View detail",
-          "uri": "http://example.com/page/222"
+          "uri": "http://example.com/page/123"
         },
-        "actions": [
-          {
-            "type": "message",
-            "label": "Buy",
-            "text": "action=buy&itemid=222"
-          }
-        ]
+        "actions": [{
+          "type": "message",
+          "label": "Set Model",
+          "text": "@setmodel " + Title
+        }, {
+          "type": "message",
+          "label": "Sample Prompt",
+          "text": GPT_sample_prompt
+        }]
       }
-    ],
-    "imageAspectRatio": "rectangle",
-    "imageSize": "cover"
-  }
-}
-          ]
+      data.append(new_member)
+
+      payload = json.dumps({
+        "replyToken":
+        replytoken,
+        "messages": [{
+          "type": "template",
+          "altText": "this is a carousel template",
+          "template": {
+            "type": "carousel",
+            "columns": data,
+            "imageAspectRatio": "square",
+            "imageSize": "cover"
+          }
+        }]
+      })
+    print(4)
+    requests.post('https://api.line.me/v2/bot/message/reply',
+                  headers=headers_for_line,
+                  data=payload)
+
+  elif user_message.startswith('@callmocar'):
+    query_condition = {
+      "GPT_type_mainModel":
+      "Cartoon"  # Modify the field and value as per your query condition
+    }
+    print(1)
+    # Query data from MongoDB based on the condition
+    query_result = model_master_collection.find(query_condition)
+    print(2)
+    # Create an empty array to store the data
+    data = []
+    print(3)
+    # Iterate over the query result and insert into the data array
+    for item in query_result:
+      thumbnail_image_url = item["GPT_model_image_link"]
+      GPT_CIVmodel_name = item["GPT_CIVmodel_name"]
+      Title = item["Title"]
+      GPT_sample_prompt = item["GPT_sample_prompt"]
+      new_member = {
+        "thumbnailImageUrl":
+        thumbnail_image_url,
+        "imageBackgroundColor":
+        "#FFFFFF",
+        "title":
+        GPT_CIVmodel_name,
+        "text":
+        "description",
+        "defaultAction": {
+          "type": "uri",
+          "label": "View detail",
+          "uri": "http://example.com/page/123"
+        },
+        "actions": [{
+          "type": "message",
+          "label": "Set Model",
+          "text": "@setmodel " + Title
+        }, {
+          "type": "message",
+          "label": "Sample Prompt",
+          "text": GPT_sample_prompt
+        }]
+      }
+      data.append(new_member)
+
+      payload = json.dumps({
+        "replyToken":
+        replytoken,
+        "messages": [{
+          "type": "template",
+          "altText": "this is a carousel template",
+          "template": {
+            "type": "carousel",
+            "columns": data,
+            "imageAspectRatio": "square",
+            "imageSize": "cover"
+          }
+        }]
+      })
+    print(4)
+    requests.post('https://api.line.me/v2/bot/message/reply',
+                  headers=headers_for_line,
+                  data=payload)
+
+  elif user_message.startswith('@callmomsc'):
+    query_condition = {
+      "GPT_type_mainModel":
+      "Msc."  # Modify the field and value as per your query condition
+    }
+    print(1)
+    # Query data from MongoDB based on the condition
+    query_result = model_master_collection.find(query_condition)
+    print(2)
+    # Create an empty array to store the data
+    data = []
+    print(3)
+    # Iterate over the query result and insert into the data array
+    for item in query_result:
+      thumbnail_image_url = item["GPT_model_image_link"]
+      GPT_CIVmodel_name = item["GPT_CIVmodel_name"]
+      Title = item["Title"]
+      GPT_sample_prompt = item["GPT_sample_prompt"]
+      new_member = {
+        "thumbnailImageUrl":
+        thumbnail_image_url,
+        "imageBackgroundColor":
+        "#FFFFFF",
+        "title":
+        GPT_CIVmodel_name,
+        "text":
+        "description",
+        "defaultAction": {
+          "type": "uri",
+          "label": "View detail",
+          "uri": "http://example.com/page/123"
+        },
+        "actions": [{
+          "type": "message",
+          "label": "Set Model",
+          "text": "@setmodel " + Title
+        }, {
+          "type": "message",
+          "label": "Sample Prompt",
+          "text": GPT_sample_prompt
+        }]
+      }
+      data.append(new_member)
+
+      payload = json.dumps({
+        "replyToken":
+        replytoken,
+        "messages": [{
+          "type": "template",
+          "altText": "this is a carousel template",
+          "template": {
+            "type": "carousel",
+            "columns": data,
+            "imageAspectRatio": "square",
+            "imageSize": "cover"
+          }
+        }]
+      })
+    print(4)
+    requests.post('https://api.line.me/v2/bot/message/reply',
+                  headers=headers_for_line,
+                  data=payload)
+
+  elif user_message.startswith('@callmodel'):
+    payload = json.dumps({
+      "replyToken":
+      replytoken,
+      "messages": [{
+        "type": "flex",
+        "altText": "Flex Message",
+        "contents": {
+          "type": "bubble",
+          "size": "micro",
+          "header": {
+            "type":
+            "box",
+            "layout":
+            "vertical",
+            "contents": [{
+              "type": "text",
+              "text": "🏷️ModelType",
+              "weight": "bold",
+              "size": "18px",
+              "color": "#FFFFFF"
+            }],
+            "backgroundColor":
+            "#32CD32"
+          },
+          "hero": {
+            "type":
+            "box",
+            "layout":
+            "vertical",
+            "contents": [{
+              "type": "button",
+              "action": {
+                "type": "message",
+                "label": "General",
+                "text": "@callmogen"
+              }
+            }, {
+              "type": "button",
+              "action": {
+                "type": "message",
+                "label": "Cartoon",
+                "text": "@callmocar"
+              }
+            }, {
+              "type": "button",
+              "action": {
+                "type": "message",
+                "label": "Photography",
+                "text": "@callmopho"
+              }
+            }, {
+              "type": "button",
+              "action": {
+                "type": "message",
+                "label": "Msc.",
+                "text": "@callmomsc"
+              }
+            }]
+          }
         }
-                        )
-    requests.post('https://api.line.me/v2/bot/message/reply', headers=headers_for_line, data=payload)
+      }]
+    })
+    requests.post('https://api.line.me/v2/bot/message/reply',
+                  headers=headers_for_line,
+                  data=payload)
 
   elif user_message.startswith('@check'):
-    json_data = image_gen_records_collection.find_one({'track_id': int(user_message.replace("@check ",""))}, {"track_id":1,"json_response": 1})
-    print(user_message.replace("@check ",""))
+    json_data = image_gen_records_collection.find_one(
+      {'track_id': int(user_message.replace("@check ", ""))}, {
+        "track_id": 1,
+        "json_response": 1
+      })
+    print(user_message.replace("@check ", ""))
     if json_data is not None:
-        track_id = json_data['track_id']
-        json_response = json_data['json_response']
-        reply_message_to_user(str(track_id) + str(json_response))
+      track_id = json_data['track_id']
+      json_response = json_data['json_response']
+      reply_message_to_user(str(track_id) + str(json_response))
     else:
-        reply_message_to_user("No record found with the specified track_id")
+      reply_message_to_user("No record found with the specified track_id")
 
   elif user_message.startswith('@curset'):
-    json_data = master_users_collection.find_one({'user_id': event.source.user_id},             {"main_model":1,"lora_model": 1})
+    json_data = master_users_collection.find_one(
+      {'user_id': event.source.user_id}, {
+        "main_model": 1,
+        "lora_model": 1
+      })
     main_model = json_data['main_model']
     lora_model = json_data['lora_model']
-    reply_message_to_user("🤖Model : " + main_model + "\n️🎚️model : " + lora_model)
+    reply_message_to_user("🤖Model : " + main_model + "\n️🎚️model : " +
+                          lora_model)
 
   elif user_message.startswith('@setmodel'):
     filter = {'user_id': event.source.user_id}
-    newvalues = {"$set": {'main_model': user_message.replace("@setmodel ", "")}}
+    newvalues = {
+      "$set": {
+        'main_model': user_message.replace("@setmodel ", "")
+      }
+    }
     master_users_collection.update_one(filter, newvalues)
     reply_message_to_user("Accept new model! : " + user_message)
 
@@ -418,51 +460,51 @@ def handle_message(event):
     reply_message_to_user("Accept new model! : " + user_message)
 
   elif user_message.startswith('@upscale'):
-      payload = json.dumps({
-     "key": my_secret4,
-     "url": user_message.replace("@upscale ", ""),
-     "scale": 3,
-     "webhook": None
+    payload = json.dumps({
+      "key": my_secret4,
+      "url": user_message.replace("@upscale ", ""),
+      "scale": 3,
+      "webhook": None
     })
-      headers = {'Content-Type': 'application/json'}
-      response = requests.post(url_upscale, headers=headers, data=payload)
-    
-      if response.ok:
+    headers = {'Content-Type': 'application/json'}
+    response = requests.post(url_upscale, headers=headers, data=payload)
+
+    if response.ok:
       # check status of ok response success or processing?
-        data = response.json()
-        print (data)
-        output_url = data['output']
-        reply_message_to_user("Upscale complete! : " + output_url)
-    
+      data = response.json()
+      print(data)
+      output_url = data['output']
+      reply_message_to_user("Upscale complete! : " + output_url)
+
   elif user_message.startswith('/img'):
     
     #check for sefl attention
     if user_message.find("@hf") > -1:
       var_self_attention = "yes"
       #when chagne global variable, there must be new local var to save new value for global var
-      x = user_message.replace("@hf","")
+      x = user_message.replace("@hf", "")
       user_message = x
-    else: 
+    else:
       var_self_attention = "no"
 
     #check for portrait ratio
     if user_message.find("--arp") > -1:
       var_height = 768
       #when chagne global variable, there must be new local var to save new value for global var
-      x = user_message.replace("--arp","")
+      x = user_message.replace("--arp", "")
       user_message = x
-    else: 
+    else:
       var_height = 512
-      
+
     #check for landscape ratio
     if user_message.find("--arl") > -1:
       var_width = 768
       #when chagne global variable, there must be new local var to save new value for global var
-      x = user_message.replace("--arl","")
+      x = user_message.replace("--arl", "")
       user_message = x
-    else: 
+    else:
       var_width = 512
-      
+
     #check for step
     if user_message.find("--step") > -1:
       #check where step begin
@@ -472,11 +514,26 @@ def handle_message(event):
       #assign variable for number after --step
       var_num_inference_steps = re.search(r'\d+', y).group()
       #delete --stepxx from user message
-      z = user_message.replace(y,"")
+      z = user_message.replace(y, "")
       #user message after delete --stepxx
       user_message = z
-    else: 
+    else:
       var_num_inference_steps = 31
+
+    #check for seed
+    if user_message.find("--seed") > -1:
+      #check where step begin
+      x = user_message.index("--seed")
+      #read the whole step (step with number)
+      y = user_message[x:]
+      #assign variable for number after --step
+      var_seed = re.search(r'\d+', y).group()
+      #delete --stepxx from user message
+      z = user_message.replace(y, "")
+      #user message after delete --stepxx
+      user_message = z
+    else:
+      var_seed = 0
 
     # Set main_model from master_users  to be in json payload
     json_data = (master_users_collection.find_one(
@@ -499,7 +556,7 @@ def handle_message(event):
     # check for negative prompt
     index = user_message.find("--no ")
     negative_prompt = user_message[index + len("--no"):].strip()
-    
+
     # check for positive prompt
     start_index = user_message.find("/img ") + len("/img")
     end_index = user_message.find("--no ")
@@ -524,14 +581,18 @@ def handle_message(event):
       "num_inference_steps": var_num_inference_steps,
       "safety_checker": "no",
       "enhance_prompt": "no",
-      "seed": 0,
+      "seed": var_seed,
       "guidance_scale": 7.5,
+      "strength": None, #param for image2image
+      "lora_strength": None, #param for image2image
+      "init_image": None, #param for image2image/inpaint
+      "mask_image": None, #param for image2image/inpaint
       "multi_lingual": "no",
       "panorama": "no",
       "self_attention": var_self_attention,
       "upscale": "no",
       "embeddings_model": "",
-      "lora_model": lora_model,
+      
       "scheduler": "UniPCMultistepScheduler",
       "webhook": None,
       "track_id": None
@@ -544,7 +605,7 @@ def handle_message(event):
     if response.ok:
       # check status of ok response success or processing?
       data = response.json()
-      print (data)
+      #print(data)
       output_status = data['status']
       output_id = data.get('id')
 
@@ -570,62 +631,74 @@ def handle_message(event):
         output_seed = jsonResponse['meta']['seed']
         output_steps = jsonResponse['meta']['steps']
         output_lora = jsonResponse['meta']['lora']
-        payload = json.dumps(
-        {
-          "replyToken": replytoken,
-          "messages": [
-            {
-              "type": "template",
-              "altText": "New image arrived!",
-              "template": {
-                "type": "buttons",
-                "thumbnailImageUrl": output_url,
-                "imageAspectRatio": "square",
-                "imageSize": "cover",
-                "imageBackgroundColor": "#FFFFFF",
-                "title": "Model : " + output_model,
-                "text": "Steps : "+str(output_steps) +" Id : "+str(output_id),
-                "defaultAction": {
-                  "type": "uri",
-                  "label": "test",
-                  "uri": output_url
-                },
-                "actions": [
-                  {
-                    "type": "uri",
-                    "label": "L : "+output_lora,
-                    "uri": output_url
-                  },
-                  {
-                    "type": "message",
-                    "label": "Upscale",
-                    "text": "@upscale " + output_url
-                  },
-                  {
-                    "type": "uri",
-                    "label": "Size : " + str(output_W)+" * "+str(output_H),
-                    "uri": output_url
-                  },
-                  {
-                    "type": "message",
-                    "label": "Seed_No : "+str(output_seed),
-                    "text": "@check "+str(output_id) 
-                  }
-                ]
-              }
-            }
-          ]
-        }
-        )
-        #send image to line user
-        requests.post('https://api.line.me/v2/bot/message/reply', headers=headers_for_line, data=payload)
         
+        #found bug that cannot reply None value for lora so add "-" if lora is None
+        if output_lora == None:
+          output_lora = "-"
+          
+        print(replytoken+" :1st "+lineUserId)
+        
+        payload = json.dumps({
+          "replyToken":
+          replytoken,
+          "messages": [{
+            "type": "template",
+            "altText": "New image arrived!",
+            "template": {
+              "type":
+              "buttons",
+              "thumbnailImageUrl":
+              output_url,
+              "imageAspectRatio":
+              "square",
+              "imageSize":
+              "cover",
+              "imageBackgroundColor":
+              "#FFFFFF",
+              "title":
+              "Model : " + output_model,
+              "text":
+              "Steps : " + str(output_steps) + " Id : " + str(output_id),
+              "defaultAction": {
+                "type": "uri",
+                "label": "test",
+                "uri": output_url
+              },
+              "actions": [{
+                "type": "uri",
+                "label": "L : " + output_lora,
+                "uri": output_url
+              }, {
+                "type": "message",
+                "label": "Upscale",
+                "text": "@upscale " + output_url
+              }, {
+                "type":
+                "uri",
+                "label":
+                "Size : " + str(output_W) + " * " + str(output_H),
+                "uri":
+                output_url
+              }, {
+                "type": "message",
+                "label": "Seed_No : " + str(output_seed),
+                "text": "@check " + str(output_id)
+              }]
+            }
+          }]
+        })
+
+        print(replytoken+" :2nd "+lineUserId)
+        requests.post('https://api.line.me/v2/bot/message/reply',
+                      headers=headers_for_line,
+                      data=payload)
+
       #if else, possible to be processing
       elif output_status == "processing":
         reply_message_to_user("We are processing, please wait.")
         jsonResponse = response.json()
         fetch_status = jsonResponse['status']
-        
+
         # Keep record to check start time of processing
         image_gen_records_collection.insert_one({
           'timestamp':
@@ -654,38 +727,39 @@ def handle_message(event):
 
           fetch_status = json_fetch_reponse['status']
 
-        #select json portion
-        output_fetch_url = json_fetch_reponse['output'][0]
+        if fetch_status == "success":
+          #select json portion
+          output_fetch_url = json_fetch_reponse['output'][0]
 
-        #exit from while then return final result
-        reply_message = output_fetch_url + " : " + str(output_id)
-        
-        #exit from while then return final result
-        reply_processing_message(reply_message)
+          #exit from while then return final result
+          reply_message = output_fetch_url + " : " + str(output_id)
+          reply_afterprocessing = reply_message
+
+          #exit from while then return final result
+          reply_processing_message(reply_afterprocessing)
+        else:
+          reply_processing_message(
+            "Error please try again or select other main_model or change lora model"
+          )
 
       #When error send raw json from stdapi to user
       else:
         jsonResponse = response.json()
-        image_gen_records_collection.insert_one({
-        'timestamp':
-        timestamp,
-        'json_response':
-        str(jsonResponse),
-        'user_id':
-        event.source.user_id
-      })
-      #send reply to user
+        #terminal inform error
+        print("error")
+        #send reply to user
         reply_message_to_user(str(jsonResponse))
 
   else:
     reply_message = "I don't know"
-    
+
     #send reply to user
     line_bot_api.reply_message(event.reply_token,
-      TextSendMessage(text=reply_message))
+                               TextSendMessage(text=reply_message))
 
   # Save the message to MongoDB
   save_message(event.source.user_id, user_message)
+
 
 def save_message(user_id, message):
 
@@ -714,16 +788,17 @@ def save_message(user_id, message):
       'main_model': "midjourney",
       'lora_model': "-"
     })
-    
+
   # Insert the document into the messages collection
   messages_collection.insert_one(message_doc)
 
 
 def reply_message_to_user(reply_message):
-  line_bot_api.reply_message(replytoken,TextSendMessage(text=reply_message))
+  line_bot_api.reply_message(replytoken, TextSendMessage(text=reply_message))
+
 
 def reply_processing_message(reply_message):
-  line_bot_api.push_message(event.source.user_id, TextSendMessage(text=reply_message))
+  line_bot_api.push_message(replytoken,lineUserId, TextSendMessage(text=reply_message))
 
 
 if __name__ == '__main__':
