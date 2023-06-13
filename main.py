@@ -92,8 +92,8 @@ def handle_message(event):
   replytoken = session["replytoken_record"]
   global lineUserId  # to save user_id in lineUserId var for sendding push message
   lineUserId = event.source.user_id
-  print("input_user: "+lineUserId)
-  print("input_reply_token: "+ replytoken)
+  print(timestamp+": "+"input_user: "+lineUserId)
+  print(timestamp+": "+"input_reply_token: "+ replytoken)
 
   # Check the user's message and set the appropriate reply message
   if user_message == "hi":
@@ -695,8 +695,8 @@ def handle_message(event):
               }
             }]
           })
-          print("image_completed_for_user: "+lineUserId)
-          print("image_completed_for_reply_token: "+replytoken)
+          print(timestamp+": "+"image_completed_for_user: "+lineUserId)
+          print(timestamp+": "+"image_completed_for_reply_token: "+replytoken)
           requests.post('https://api.line.me/v2/bot/message/reply',
                         headers=headers_for_line,
                         data=payload)
@@ -737,7 +737,9 @@ def handle_message(event):
             reply_message = output_fetch_url + " : " + str(output_id)
         
             #exit from while then return final result
-            line_bot_api.reply_message(event.reply_token,
+            print("image_completed_for_user: "+lineUserId)
+            print("image_completed_for_reply_token: "+replytoken)   
+            line_bot_api.reply_message(event.reply_token,                        
             TextSendMessage(text=reply_message))
         
         else:
