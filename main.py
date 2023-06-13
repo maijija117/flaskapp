@@ -567,8 +567,13 @@ def handle_message(event):
 
     # check for negative prompt
     index = user_message.find("--no ")
-    negative_prompt = user_message[index + len("--no"):].strip()
-
+    if index != -1:
+      # Extract the negative prompt
+      negative_prompt = user_message[index + len("--no"):].strip()
+    else:
+      # No "--no" found, set negative prompt to empty string
+      negative_prompt = ""
+     
     # check for positive prompt
     start_index = user_message.find("/img ") + len("/img")
     end_index = user_message.find("--no ")
