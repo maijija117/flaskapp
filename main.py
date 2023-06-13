@@ -1,4 +1,5 @@
-from flask import Flask, request, abort
+from flask import Flask, request, abort, session
+from flask_session import Session
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError, LineBotApiError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage, StickerSendMessage, TemplateSendMessage, ButtonsTemplate, PostbackAction, MessageAction, URIAction
@@ -37,6 +38,9 @@ var_num_inference_steps = 31
 var_seed = 0
 
 app = Flask(__name__)
+app.config['SESSION_TYPE'] = 'filesystem'
+Session(app)
+app.secret_key = "10672"
 
 line_bot_api = LineBotApi(my_secret)
 handler = WebhookHandler(my_secret2)
@@ -67,6 +71,7 @@ def callback():
   try:
     # Handle the webhook event with the provided signature and body
     handler.handle(body, signature)
+    
   except InvalidSignatureError:
     # If the signature is invalid, abort the request with a 400 error
     abort(400)
@@ -80,16 +85,18 @@ def callback():
 def handle_message(event):
   # Retrieve the user's message and convert it to lowercase
   user_message = event.message.text.lower()
+  session["replytoken_record"] = event.reply_token
   global reply_message
   global replytoken
   global payload
-  replytoken = event.reply_token
+  replytoken = session["replytoken_record"]
   global lineUserId  # to save user_id in lineUserId var for sendding push message
   lineUserId = event.source.user_id
+  print("input_user: "+lineUserId)
+  print("input_reply_token: "+ replytoken)
 
   # Check the user's message and set the appropriate reply message
   if user_message == "hi":
-    print(replytoken+" :1st "+lineUserId)
     reply_message_to_user("Good morning")
 
   elif user_message == "no":
@@ -100,13 +107,13 @@ def handle_message(event):
       "GPT_type_mainModel":
       "Photography"  # Modify the field and value as per your query condition
     }
-    print(1)
+
     # Query data from MongoDB based on the condition
     query_result = model_master_collection.find(query_condition)
-    print(2)
+
     # Create an empty array to store the data
     data = []
-    print(3)
+
     # Iterate over the query result and insert into the data array
     for item in query_result:
       thumbnail_image_url = item["GPT_model_image_link"]
@@ -153,7 +160,7 @@ def handle_message(event):
           }
         }]
       })
-    print(4)
+
     requests.post('https://api.line.me/v2/bot/message/reply',
                   headers=headers_for_line,
                   data=payload)
@@ -163,13 +170,13 @@ def handle_message(event):
       "GPT_type_mainModel":
       "General"  # Modify the field and value as per your query condition
     }
-    print(1)
+
     # Query data from MongoDB based on the condition
     query_result = model_master_collection.find(query_condition)
-    print(2)
+
     # Create an empty array to store the data
     data = []
-    print(3)
+
     # Iterate over the query result and insert into the data array
     for item in query_result:
       thumbnail_image_url = item["GPT_model_image_link"]
@@ -216,7 +223,7 @@ def handle_message(event):
           }
         }]
       })
-    print(4)
+
     requests.post('https://api.line.me/v2/bot/message/reply',
                   headers=headers_for_line,
                   data=payload)
@@ -226,13 +233,13 @@ def handle_message(event):
       "GPT_type_mainModel":
       "Cartoon"  # Modify the field and value as per your query condition
     }
-    print(1)
+
     # Query data from MongoDB based on the condition
     query_result = model_master_collection.find(query_condition)
-    print(2)
+
     # Create an empty array to store the data
     data = []
-    print(3)
+
     # Iterate over the query result and insert into the data array
     for item in query_result:
       thumbnail_image_url = item["GPT_model_image_link"]
@@ -279,7 +286,7 @@ def handle_message(event):
           }
         }]
       })
-    print(4)
+
     requests.post('https://api.line.me/v2/bot/message/reply',
                   headers=headers_for_line,
                   data=payload)
@@ -289,13 +296,13 @@ def handle_message(event):
       "GPT_type_mainModel":
       "Msc."  # Modify the field and value as per your query condition
     }
-    print(1)
+
     # Query data from MongoDB based on the condition
     query_result = model_master_collection.find(query_condition)
-    print(2)
+
     # Create an empty array to store the data
     data = []
-    print(3)
+
     # Iterate over the query result and insert into the data array
     for item in query_result:
       thumbnail_image_url = item["GPT_model_image_link"]
@@ -342,7 +349,7 @@ def handle_message(event):
           }
         }]
       })
-    print(4)
+
     requests.post('https://api.line.me/v2/bot/message/reply',
                   headers=headers_for_line,
                   data=payload)
@@ -420,7 +427,7 @@ def handle_message(event):
         "track_id": 1,
         "json_response": 1
       })
-    print(user_message.replace("@check ", ""))
+    
     if json_data is not None:
       track_id = json_data['track_id']
       json_response = json_data['json_response']
@@ -477,6 +484,7 @@ def handle_message(event):
       reply_message_to_user("Upscale complete! : " + output_url)
 
   elif user_message.startswith('/img'):
+
     
     #check for sefl attention
     if user_message.find("@hf") > -1:
@@ -569,187 +577,183 @@ def handle_message(event):
     else:
       positive_prompt = None
 
-    # Begin parameter for payload
-    payload = json.dumps({
-      "key": my_secret4,
-      "model_id": main_model,
-      "prompt": positive_prompt,
-      "negative_prompt": negative_prompt,
-      "width": var_width,
-      "height": var_height,
-      "samples": "1",
-      "num_inference_steps": var_num_inference_steps,
-      "safety_checker": "no",
-      "enhance_prompt": "no",
-      "seed": var_seed,
-      "guidance_scale": 7.5,
-      "strength": None, #param for image2image
-      "lora_strength": None, #param for image2image
-      "init_image": None, #param for image2image/inpaint
-      "mask_image": None, #param for image2image/inpaint
-      "multi_lingual": "no",
-      "panorama": "no",
-      "self_attention": var_self_attention,
-      "upscale": "no",
-      "embeddings_model": "",
+    if "replytoken_record" in session:
+
+      # Begin parameter for payload
+      payload = json.dumps({
+        "key": my_secret4,
+        "model_id": main_model,
+        "prompt": positive_prompt,
+        "negative_prompt": negative_prompt,
+        "width": var_width,
+        "height": var_height,
+        "samples": "1",
+        "num_inference_steps": var_num_inference_steps,
+        "safety_checker": "no",
+        "enhance_prompt": "no",
+        "seed": var_seed,
+        "guidance_scale": 7.5,
+        "strength": None, #param for image2image
+        "lora_strength": None, #param for image2image
+        "init_image": None, #param for image2image/inpaint
+        "mask_image": None, #param for image2image/inpaint
+        "multi_lingual": "no",
+        "panorama": "no",
+        "self_attention": var_self_attention,
+        "upscale": "no",
+        "embeddings_model": "",
+        
+        "scheduler": "UniPCMultistepScheduler",
+        "webhook": None,
+        "track_id": None
+      })
       
-      "scheduler": "UniPCMultistepScheduler",
-      "webhook": None,
-      "track_id": None
-    })
-
-    headers = {'Content-Type': 'application/json'}
-
-    response = requests.post(urlstdapi, headers=headers, data=payload)
-
-    if response.ok:
-      # check status of ok response success or processing?
-      data = response.json()
-      #print(data)
-      output_status = data['status']
-      output_id = data.get('id')
-
-      # if success
-      if output_status == "success":
-        jsonResponse = response.json()
-        image_gen_records_collection.insert_one({
-          'timestamp':
-          timestamp,
-          'json_response':
-          str(jsonResponse),
-          'user_id':
-          event.source.user_id,
-          'track_id':
-          output_id
-        })
-        output_url = jsonResponse['output'][0]
-        #output_W = jsonResponse['W']
-        #output_H = jsonResponse['H']
-        output_model = jsonResponse['meta']['model_id']
-        output_W = jsonResponse['meta']['W']
-        output_H = jsonResponse['meta']['H']
-        output_seed = jsonResponse['meta']['seed']
-        output_steps = jsonResponse['meta']['steps']
-        output_lora = jsonResponse['meta']['lora']
-        
-        #found bug that cannot reply None value for lora so add "-" if lora is None
-        if output_lora == None:
-          output_lora = "-"
+      headers = {'Content-Type': 'application/json'}
+      
+      response = requests.post(urlstdapi, headers=headers, data=payload)
+  
+      if response.ok:
+        # check status of ok response success or processing?
+        data = response.json()
+        #print(data)
+        output_status = data['status']
+        output_id = data.get('id')
+  
+        # if success
+        if output_status == "success":
+          jsonResponse = response.json()
+          image_gen_records_collection.insert_one({
+            'timestamp':
+            timestamp,
+            'json_response':
+            str(jsonResponse),
+            'user_id':
+            event.source.user_id,
+            'track_id':
+            output_id
+          })
+          output_url = jsonResponse['output'][0]
+          #output_W = jsonResponse['W']
+          #output_H = jsonResponse['H']
+          output_model = jsonResponse['meta']['model_id']
+          output_W = jsonResponse['meta']['W']
+          output_H = jsonResponse['meta']['H']
+          output_seed = jsonResponse['meta']['seed']
+          output_steps = jsonResponse['meta']['steps']
+          output_lora = jsonResponse['meta']['lora']
           
-        print(replytoken+" :1st "+lineUserId)
-        
-        payload = json.dumps({
-          "replyToken":
-          replytoken,
-          "messages": [{
-            "type": "template",
-            "altText": "New image arrived!",
-            "template": {
-              "type":
-              "buttons",
-              "thumbnailImageUrl":
-              output_url,
-              "imageAspectRatio":
-              "square",
-              "imageSize":
-              "cover",
-              "imageBackgroundColor":
-              "#FFFFFF",
-              "title":
-              "Model : " + output_model,
-              "text":
-              "Steps : " + str(output_steps) + " Id : " + str(output_id),
-              "defaultAction": {
-                "type": "uri",
-                "label": "test",
-                "uri": output_url
-              },
-              "actions": [{
-                "type": "uri",
-                "label": "L : " + output_lora,
-                "uri": output_url
-              }, {
-                "type": "message",
-                "label": "Upscale",
-                "text": "@upscale " + output_url
-              }, {
+          #found bug that cannot reply None value for lora so add "-" if lora is None
+          if output_lora == None:
+            output_lora = "-"
+          
+          payload = json.dumps({
+            "replyToken":
+            replytoken,
+            "messages": [{
+              "type": "template",
+              "altText": "New image arrived!",
+              "template": {
                 "type":
-                "uri",
-                "label":
-                "Size : " + str(output_W) + " * " + str(output_H),
-                "uri":
-                output_url
-              }, {
-                "type": "message",
-                "label": "Seed_No : " + str(output_seed),
-                "text": "@check " + str(output_id)
-              }]
-            }
-          }]
-        })
-
-        print(replytoken+" :2nd "+lineUserId)
-        requests.post('https://api.line.me/v2/bot/message/reply',
-                      headers=headers_for_line,
-                      data=payload)
-
-      #if else, possible to be processing
-      elif output_status == "processing":
-        reply_message_to_user("We are processing, please wait.")
-        jsonResponse = response.json()
-        fetch_status = jsonResponse['status']
-
-        # Keep record to check start time of processing
-        image_gen_records_collection.insert_one({
-          'timestamp':
-          timestamp,
-          'json_response':
-          str(jsonResponse),
-          'user_id':
-          event.source.user_id
-        })
-
-        #whil loop until fetch_status <> processing
-        while fetch_status == "processing":
-          #wait until 60 second, then fetch data
-          time.sleep(60)
-          payload = json.dumps({"key": my_secret4, "request_id": output_id})
-          headers = {'Content-Type': 'application/json'}
-
-          #Keep response value
-          fetch_response = requests.request("POST",
-                                            url_fetch,
-                                            headers=headers,
-                                            data=payload)
-
-          #parse json
-          json_fetch_reponse = fetch_response.json()
-
-          fetch_status = json_fetch_reponse['status']
-
-        if fetch_status == "success":
-          #select json portion
-          output_fetch_url = json_fetch_reponse['output'][0]
-
-          #exit from while then return final result
-          reply_message = output_fetch_url + " : " + str(output_id)
-          reply_afterprocessing = reply_message
-
-          #exit from while then return final result
-          reply_processing_message(reply_afterprocessing)
+                "buttons",
+                "thumbnailImageUrl":
+                output_url,
+                "imageAspectRatio":
+                "square",
+                "imageSize":
+                "cover",
+                "imageBackgroundColor":
+                "#FFFFFF",
+                "title":
+                "Model : " + output_model,
+                "text":
+                "Steps : " + str(output_steps) + " Id : " + str(output_id),
+                "defaultAction": {
+                  "type": "uri",
+                  "label": "test",
+                  "uri": output_url
+                },
+                "actions": [{
+                  "type": "uri",
+                  "label": "L : " + output_lora,
+                  "uri": output_url
+                }, {
+                  "type": "message",
+                  "label": "Upscale",
+                  "text": "@upscale " + output_url
+                }, {
+                  "type":
+                  "uri",
+                  "label":
+                  "Size : " + str(output_W) + " * " + str(output_H),
+                  "uri":
+                  output_url
+                }, {
+                  "type": "message",
+                  "label": "Seed_No : " + str(output_seed),
+                  "text": "@check " + str(output_id)
+                }]
+              }
+            }]
+          })
+          print("image_completed_for_user: "+lineUserId)
+          print("image_completed_for_reply_token: "+replytoken)
+          requests.post('https://api.line.me/v2/bot/message/reply',
+                        headers=headers_for_line,
+                        data=payload)
+  
+        #if else, possible to be processing
+        elif output_status == "processing":
+          jsonResponse = response.json()
+          fetch_status = jsonResponse['status']
+  
+          # Keep record to check start time of processing
+          image_gen_records_collection.insert_one({
+            'timestamp':
+            timestamp,
+            'json_response':
+            str(jsonResponse),
+            'user_id':
+            event.source.user_id
+          })
+  
+          #whil loop until fetch_status <> processing
+                 #whil loop until fetch_status <> processing
+          while fetch_status == "processing":
+            #wait until 60 second, then fetch data
+            time.sleep(60)
+            payload = json.dumps({"key": my_secret4, "request_id": output_id})
+            headers = {'Content-Type': 'application/json'}
+            #Keep response value
+            fetch_response = requests.request("POST",
+                                              url_fetch,
+                                              headers=headers,
+                                              data=payload)
+            #parse json
+            json_fetch_reponse = fetch_response.json()
+            fetch_status = json_fetch_reponse['status']
+            #select json portion
+            output_fetch_url = json_fetch_reponse['output'][0]
+            #exit from while then return final result
+            reply_message = output_fetch_url + " : " + str(output_id)
+        
+            #exit from while then return final result
+            line_bot_api.reply_message(event.reply_token,
+            TextSendMessage(text=reply_message))
+        
         else:
-          reply_processing_message(
-            "Error please try again or select other main_model or change lora model"
-          )
-
-      #When error send raw json from stdapi to user
+          reply_message_to_user("Error please try again or select other main_model or change lora model")
+  
+        #When error send raw json from stdapi to user
       else:
         jsonResponse = response.json()
         #terminal inform error
         print("error")
         #send reply to user
-        reply_message_to_user(str(jsonResponse))
+        reply_message_to_user(str(jsonResponse))                        
 
+    else:
+      print("Reply token not found")
+      
   else:
     reply_message = "I don't know"
 

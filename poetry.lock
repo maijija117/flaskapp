@@ -85,6 +85,14 @@ tests-no-zope = ["hypothesis", "pympler", "pytest (>=4.3.0)", "pytest-xdist", "c
 tests_no_zope = ["hypothesis", "pympler", "pytest (>=4.3.0)", "pytest-xdist", "cloudpickle", "mypy (>=0.971,<0.990)", "pytest-mypy-plugins"]
 
 [[package]]
+name = "cachelib"
+version = "0.10.2"
+description = "A collection of cache libraries in the same API interface."
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[[package]]
 name = "certifi"
 version = "2022.12.7"
 description = "Python package for providing Mozilla's CA Bundle."
@@ -194,6 +202,18 @@ Werkzeug = ">=2.2.2"
 [package.extras]
 async = ["asgiref (>=3.2)"]
 dotenv = ["python-dotenv"]
+
+[[package]]
+name = "flask-session"
+version = "0.5.0"
+description = "Server-side session support for Flask"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+cachelib = "*"
+flask = ">=2.2"
 
 [[package]]
 name = "frozenlist"
@@ -637,7 +657,7 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.10.0,<3.11"
-content-hash = "f46dec72ec6d39d5a2864a7f5047a9f3f7403bc7c042254852d415ca1d6d42cf"
+content-hash = "eeefa2d4ce15e0e4c5a6e44b3ed1020311ea31390ca26cbe1db8fe896ec543e7"
 
 [metadata.files]
 aiohttp = []
@@ -646,6 +666,7 @@ argon2-cffi = []
 argon2-cffi-bindings = []
 async-timeout = []
 attrs = []
+cachelib = []
 certifi = []
 cffi = []
 charset-normalizer = []
@@ -655,6 +676,7 @@ cryptography = []
 debugpy = []
 dnspython = []
 flask = []
+flask-session = []
 frozenlist = []
 future = []
 idna = []
