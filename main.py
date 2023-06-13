@@ -24,6 +24,7 @@ my_secret = os.environ['LINE_ACCESS_TOKEN']
 my_secret2 = os.environ['LINE_SECRET']
 my_secret3 = os.environ['MONGO_DB_CONNECTION']
 my_secret4 = os.environ['STD_API_KEY']
+my_secret5 = os.environ['SESSION_SECRET_KEY']
 headers_for_line = {
   'Content-Type': 'application/json',
   'Authorization': 'Bearer' + " " + my_secret
@@ -40,7 +41,7 @@ var_seed = 0
 app = Flask(__name__)
 app.config['SESSION_TYPE'] = 'filesystem'
 Session(app)
-app.secret_key = "10672"
+app.secret_key = my_secret5
 
 line_bot_api = LineBotApi(my_secret)
 handler = WebhookHandler(my_secret2)
