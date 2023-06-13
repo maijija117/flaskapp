@@ -71,7 +71,7 @@ def callback():
   try:
     # Handle the webhook event with the provided signature and body
     handler.handle(body, signature)
-    
+
   except InvalidSignatureError:
     # If the signature is invalid, abort the request with a 400 error
     abort(400)
@@ -85,15 +85,18 @@ def callback():
 def handle_message(event):
   # Retrieve the user's message and convert it to lowercase
   user_message = event.message.text.lower()
-  session["replytoken_record"] = event.reply_token
   global reply_message
-  global replytoken
   global payload
-  replytoken = session["replytoken_record"]
   global lineUserId  # to save user_id in lineUserId var for sendding push message
+  # Retrieve the reply token from the session data or generate a new one
+  replytoken = session.get("replytoken")
+  if replytoken is None:
+    replytoken = event.reply_token
+    session["replytoken"] = replytoken
+
   lineUserId = event.source.user_id
-  print(timestamp+": "+"input_user: "+lineUserId)
-  print(timestamp+": "+"input_reply_token: "+ replytoken)
+  print(timestamp + ": " + "input_user: " + lineUserId)
+  print(timestamp + ": " + "input_reply_token: " + replytoken)
 
   # Check the user's message and set the appropriate reply message
   if user_message == "hi":
@@ -427,7 +430,7 @@ def handle_message(event):
         "track_id": 1,
         "json_response": 1
       })
-    
+
     if json_data is not None:
       track_id = json_data['track_id']
       json_response = json_data['json_response']
@@ -485,7 +488,6 @@ def handle_message(event):
 
   elif user_message.startswith('/img'):
 
-    
     #check for sefl attention
     if user_message.find("@hf") > -1:
       var_self_attention = "yes"
@@ -577,8 +579,8 @@ def handle_message(event):
     else:
       positive_prompt = None
 
-    if "replytoken_record" in session:
-
+    if "replytoken" in session:
+      replytoken = session.get("replytoken")
       # Begin parameter for payload
       payload = json.dumps({
         "key": my_secret4,
@@ -593,32 +595,31 @@ def handle_message(event):
         "enhance_prompt": "no",
         "seed": var_seed,
         "guidance_scale": 7.5,
-        "strength": None, #param for image2image
-        "lora_strength": None, #param for image2image
-        "init_image": None, #param for image2image/inpaint
-        "mask_image": None, #param for image2image/inpaint
+        "strength": None,  #param for image2image
+        "lora_strength": None,  #param for image2image
+        "init_image": None,  #param for image2image/inpaint
+        "mask_image": None,  #param for image2image/inpaint
         "multi_lingual": "no",
         "panorama": "no",
         "self_attention": var_self_attention,
         "upscale": "no",
         "embeddings_model": "",
-        
         "scheduler": "UniPCMultistepScheduler",
         "webhook": None,
         "track_id": None
       })
-      
+
       headers = {'Content-Type': 'application/json'}
-      
+
       response = requests.post(urlstdapi, headers=headers, data=payload)
-  
+
       if response.ok:
         # check status of ok response success or processing?
         data = response.json()
         #print(data)
         output_status = data['status']
         output_id = data.get('id')
-  
+
         # if success
         if output_status == "success":
           jsonResponse = response.json()
@@ -641,11 +642,11 @@ def handle_message(event):
           output_seed = jsonResponse['meta']['seed']
           output_steps = jsonResponse['meta']['steps']
           output_lora = jsonResponse['meta']['lora']
-          
+
           #found bug that cannot reply None value for lora so add "-" if lora is None
           if output_lora == None:
             output_lora = "-"
-          
+
           payload = json.dumps({
             "replyToken":
             replytoken,
@@ -695,17 +696,18 @@ def handle_message(event):
               }
             }]
           })
-          print(timestamp+": "+"image_completed_for_user: "+lineUserId)
-          print(timestamp+": "+"image_completed_for_reply_token: "+replytoken)
+          print(timestamp + ": " + "image_completed_for_user: " + lineUserId)
+          print(timestamp + ": " + "image_completed_for_reply_token: " +
+                replytoken)
           requests.post('https://api.line.me/v2/bot/message/reply',
                         headers=headers_for_line,
                         data=payload)
-  
+
         #if else, possible to be processing
         elif output_status == "processing":
           jsonResponse = response.json()
           fetch_status = jsonResponse['status']
-  
+
           # Keep record to check start time of processing
           image_gen_records_collection.insert_one({
             'timestamp':
@@ -715,9 +717,9 @@ def handle_message(event):
             'user_id':
             event.source.user_id
           })
-  
+
           #whil loop until fetch_status <> processing
-                 #whil loop until fetch_status <> processing
+          #whil loop until fetch_status <> processing
           while fetch_status == "processing":
             #wait until 60 second, then fetch data
             time.sleep(60)
@@ -735,27 +737,30 @@ def handle_message(event):
             output_fetch_url = json_fetch_reponse['output'][0]
             #exit from while then return final result
             reply_message = output_fetch_url + " : " + str(output_id)
-        
+
             #exit from while then return final result
-            print("image_completed_for_user: "+lineUserId)
-            print("image_completed_for_reply_token: "+replytoken)   
-            line_bot_api.reply_message(event.reply_token,                        
-            TextSendMessage(text=reply_message))
-        
+            print("image_completed_for_user: " + lineUserId)
+            print("image_completed_for_reply_token: " + replytoken)
+            print("result come after processing pending")
+            line_bot_api.reply_message(event.reply_token,
+                                       TextSendMessage(text=reply_message))
+
         else:
-          reply_message_to_user("Error please try again or select other main_model or change lora model")
-  
+          reply_message_to_user(
+            "Error please try again or select other main_model or change lora model"
+          )
+
         #When error send raw json from stdapi to user
       else:
         jsonResponse = response.json()
         #terminal inform error
         print("error")
         #send reply to user
-        reply_message_to_user(str(jsonResponse))                        
+        reply_message_to_user(str(jsonResponse))
 
     else:
       print("Reply token not found")
-      
+
   else:
     reply_message = "I don't know"
 
@@ -800,11 +805,14 @@ def save_message(user_id, message):
 
 
 def reply_message_to_user(reply_message):
+  replytoken = session.get("replytoken")
   line_bot_api.reply_message(replytoken, TextSendMessage(text=reply_message))
 
 
 def reply_processing_message(reply_message):
-  line_bot_api.push_message(replytoken,lineUserId, TextSendMessage(text=reply_message))
+  replytoken = session.get("replytoken")
+  line_bot_api.push_message(replytoken, lineUserId,
+                            TextSendMessage(text=reply_message))
 
 
 if __name__ == '__main__':
