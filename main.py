@@ -25,6 +25,7 @@ my_secret2 = os.environ['LINE_SECRET']
 my_secret3 = os.environ['MONGO_DB_CONNECTION']
 my_secret4 = os.environ['STD_API_KEY']
 my_secret5 = os.environ['SESSION_SECRET_KEY']
+
 headers_for_line = {
   'Content-Type': 'application/json',
   'Authorization': 'Bearer' + " " + my_secret
@@ -88,7 +89,7 @@ def handle_message(event):
   user_message = event.message.text.lower()
   global reply_message
   global payload
-  global lineUserId  # to save user_id in lineUserId var for sendding push message
+  # to save user_id in lineUserId var for sendding push message
   # Retrieve the reply token from the session data or generate a new one
   replytoken = session.get("replytoken")
   if replytoken is None:
