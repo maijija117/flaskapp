@@ -42,6 +42,7 @@ var_lora = ''
 var_init_iamge = ''
 var_strength = ''
 controlnet_model0 =''
+emb_model =''
 
 app = Flask(__name__)
 app.config['SESSION_TYPE'] = 'filesystem'
@@ -60,6 +61,7 @@ messages_collection = db['messages']
 master_users_collection = db['master_users']
 image_gen_records_collection = db['image_gen_records_collection']
 model_master_collection = db["model_master"]
+lora_and_emb_master_collection = db["lora_and_emb_master"]
 
 # Get the current time in Thailand timezone
 current_time = datetime.now(timezone)
@@ -267,7 +269,7 @@ def handle_message(event):
         "defaultAction": {
           "type": "uri",
           "label": "View detail",
-          "uri": "http://example.com/page/123"
+          "uri": thumbnail_image_url
         },
         "actions": [{
           "type": "message",
@@ -429,6 +431,68 @@ def handle_message(event):
     requests.post('https://api.line.me/v2/bot/message/reply',
                   headers=headers_for_line,
                   data=payload)
+    
+  elif user_message.startswith('@calllora'):
+    query_condition = {
+        "$or": [
+            {"GPT_LoraOrEmbedding": "Lora"},
+            {"GPT_LoraOrEmbedding": "Embedding"}]}
+
+
+    # Query data from MongoDB based on the condition
+    query_result = lora_and_emb_master_collection.find(query_condition)
+
+    # Create an empty array to store the data
+    data = []
+
+
+    for item in query_result:
+
+      thumbnail_image_url = item["GPT_LoraEmbedding_Image"]
+      GPT_CIVmodel_name = item["title"]
+      GPT_LoraEmbedding_Name = item["GPT_LoraEmbedding_Name"]
+      command_type = item["command_type"]
+  
+      new_member = {
+        "thumbnailImageUrl":thumbnail_image_url,
+        "imageBackgroundColor":"#FFFFFF",
+        "title":GPT_CIVmodel_name,
+        "text":"description",
+  
+        "defaultAction": {
+        "type": "uri",
+        "label": "View detail",
+        "uri": thumbnail_image_url
+        },
+  
+          "actions": [{
+            "type": "message",
+            "label": "Set Model",
+            "text": command_type + GPT_LoraEmbedding_Name
+          }]
+  
+        	}
+  
+      data.append(new_member)
+	
+      payload = json.dumps({
+        "replyToken":
+        replytoken,
+        "messages": [{
+          "type": "template",
+          "altText": "this is a carousel template",
+          "template": {
+            "type": "carousel",
+            "columns": data,
+            "imageAspectRatio": "square",
+            "imageSize": "cover"
+          }
+        }]
+      })
+
+    requests.post('https://api.line.me/v2/bot/message/reply',
+                  headers=headers_for_line,
+                  data=payload)
 
   elif user_message.startswith('@callcont'):
     payload = json.dumps({
@@ -528,12 +592,14 @@ def handle_message(event):
       {'user_id': event.source.user_id}, {
         "main_model": 1,
         "lora_model": 1,
-        "controlnet_model0": 1
+        "controlnet_model0": 1,
+        "emb_model":1
       })
     main_model = json_data['main_model']
     lora_model = json_data['lora_model']
     controlnet_model0 = json_data['controlnet_model0']
-    reply_message_to_user("🤖Model : " + main_model + "\n️🎚️model : " + lora_model + "\n️🕹️control_net :" + controlnet_model0)
+    emb_model = json_data['emb_model']
+    reply_message_to_user("🤖Model : " + main_model + "\n️🎚️lora_model : " +     lora_model + "\n🎚️emb_model :" + emb_model + "\n️🕹️control_net :" + controlnet_model0)
 
   elif user_message.startswith('@setmodel'):
     filter = {'user_id': event.source.user_id}
@@ -550,6 +616,16 @@ def handle_message(event):
     newvalues = {
       "$set": {
         'lora_model': user_message.replace("@setlora ", ""),
+      }
+    }
+    master_users_collection.update_one(filter, newvalues)
+    reply_message_to_user("Accept new model! : " + user_message)
+
+  elif user_message.startswith('@setemb'):
+    filter = {'user_id': event.source.user_id}
+    newvalues = {
+      "$set": {
+        'emb_model': user_message.replace("@setemb ", ""),
       }
     }
     master_users_collection.update_one(filter, newvalues)
@@ -689,7 +765,15 @@ def handle_message(event):
     # If lora in Mongo equal - this mean None for json payload
     if lora_model == "-":
       lora_model = None
-
+      
+    # Set emb model
+    json_data2 = (master_users_collection.find_one(
+    {'user_id': event.source.user_id}, {"emb_model": 1}))
+    emb_model = json_data2['emb_model']
+    
+    # If lora in Mongo equal - this mean None for json payload
+    if emb_model == "-":
+      emb_model = None
     # If not just select normal lora
     # else:
     #lora_model =json_data1['lora_model']
@@ -744,7 +828,7 @@ def handle_message(event):
         "panorama": "no",
         "self_attention": var_self_attention,
         "upscale": "no",
-        "embeddings_model": "",
+        "embeddings_model": emb_model,
         "scheduler": "UniPCMultistepScheduler",
         "webhook": None,
         "track_id": None
