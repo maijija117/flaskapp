@@ -38,6 +38,7 @@ var_width = 512
 var_height = 512
 var_num_inference_steps = 31
 var_seed = 0
+var_lora = ''
 
 app = Flask(__name__)
 app.config['SESSION_TYPE'] = 'filesystem'
@@ -551,20 +552,19 @@ def handle_message(event):
     json_data = (master_users_collection.find_one(
       {'user_id': event.source.user_id}, {"main_model": 1}))
     main_model = json_data['main_model']
-
+    print(main_model)
     # Set lora model
     json_data1 = (master_users_collection.find_one(
       {'user_id': event.source.user_id}, {"lora_model": 1}))
     lora_model = json_data1['lora_model']
-
+    print(lora_model)
     # If lora in Mongo equal - this mean None for json payload
     if lora_model == "-":
       lora_model = None
 
     # If not just select normal lora
-    else:
-      lora_model = json_data1['lora_model']
-
+    # else:
+    #lora_model =json_data1['lora_model']
     # check for negative prompt
     index = user_message.find("--no ")
     if index != -1:
@@ -603,7 +603,8 @@ def handle_message(event):
         "seed": var_seed,
         "guidance_scale": 7.5,
         "strength": None,  #param for image2image
-        "lora_strength": None,  #param for image2image
+        "lora_model": lora_model,
+        "lora_strength": 0.6,  #param for image2image
         "init_image": None,  #param for image2image/inpaint
         "mask_image": None,  #param for image2image/inpaint
         "multi_lingual": "no",
@@ -631,14 +632,10 @@ def handle_message(event):
         if output_status == "success":
           jsonResponse = response.json()
           image_gen_records_collection.insert_one({
-            'timestamp':
-            timestamp,
-            'json_response':
-            str(jsonResponse),
-            'user_id':
-            event.source.user_id,
-            'track_id':
-            output_id
+            'timestamp':timestamp,
+            'json_response':str(jsonResponse),
+            'user_id':event.source.user_id,
+            'track_id':output_id
           })
           output_url = jsonResponse['output'][0]
           #output_W = jsonResponse['W']
@@ -717,12 +714,10 @@ def handle_message(event):
 
           # Keep record to check start time of processing
           image_gen_records_collection.insert_one({
-            'timestamp':
-            timestamp,
-            'json_response':
-            str(jsonResponse),
-            'user_id':
-            event.source.user_id
+            'timestamp':timestamp,
+            'json_response':str(jsonResponse),
+            'user_id':event.source.user_id,
+            'track_id':output_id
           })
 
           #whil loop until fetch_status <> processing
