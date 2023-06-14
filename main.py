@@ -39,6 +39,9 @@ var_height = 512
 var_num_inference_steps = 31
 var_seed = 0
 var_lora = ''
+var_init_iamge = ''
+var_strength = ''
+controlnet_model0 =''
 
 app = Flask(__name__)
 app.config['SESSION_TYPE'] = 'filesystem'
@@ -87,7 +90,7 @@ def callback():
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
   # Retrieve the user's message and convert it to lowercase
-  user_message = event.message.text.lower()
+  user_message = event.message.text
   global reply_message
   global payload
   # to save user_id in lineUserId var for sendding push message
@@ -427,6 +430,85 @@ def handle_message(event):
                   headers=headers_for_line,
                   data=payload)
 
+  elif user_message.startswith('@callcont'):
+    payload = json.dumps({
+    "replyToken": replytoken,
+    "messages": [
+    {
+      "type": "flex",
+      "altText": "Flex Message",
+      "contents": {
+        "type": "bubble",
+        "size": "micro",
+        "header": {
+          "type": "box",
+          "layout": "vertical",
+          "contents": [
+            {
+              "type": "text",
+              "text": "🕹️Controlnet_List",
+              "color": "#FFFFFF",
+              "size": "18px",
+              "weight": "bold"
+            }
+          ],
+          "backgroundColor": "#32CD32"
+        },
+        "body": {
+          "type": "box",
+          "layout": "vertical",
+          "contents": [
+            {
+              "type": "button",
+              "action": {
+                "type": "message",
+                "label": "CANNY",
+                "text": "@setcont canny"
+              }
+            },
+            {
+              "type": "button",
+              "action": {
+                "type": "message",
+                "label": "DEPTH",
+                "text": "@setcont depth"
+              }
+            },
+            {
+              "type": "button",
+              "action": {
+                "type": "message",
+                "label": "MLSD",
+                "text": "@setcont mlsd"
+              }
+            },
+            {
+              "type": "button",
+              "action": {
+                "type": "message",
+                "label": "OPENPOSE",
+                "text": "@setcont openpose"
+              }
+            },
+            {
+              "type": "button",
+              "action": {
+                "type": "message",
+                "label": "SCRIBBLE",
+                "text": "@setcont scribble"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
+    )
+    requests.post('https://api.line.me/v2/bot/message/reply',
+                  headers=headers_for_line,
+                  data=payload)
+
   elif user_message.startswith('@check'):
     json_data = image_gen_records_collection.find_one(
       {'track_id': int(user_message.replace("@check ", ""))}, {
@@ -445,12 +527,13 @@ def handle_message(event):
     json_data = master_users_collection.find_one(
       {'user_id': event.source.user_id}, {
         "main_model": 1,
-        "lora_model": 1
+        "lora_model": 1,
+        "controlnet_model0": 1
       })
     main_model = json_data['main_model']
     lora_model = json_data['lora_model']
-    reply_message_to_user("🤖Model : " + main_model + "\n️🎚️model : " +
-                          lora_model)
+    controlnet_model0 = json_data['controlnet_model0']
+    reply_message_to_user("🤖Model : " + main_model + "\n️🎚️model : " + lora_model + "\n️🕹️control_net :" + controlnet_model0)
 
   elif user_message.startswith('@setmodel'):
     filter = {'user_id': event.source.user_id}
@@ -472,6 +555,16 @@ def handle_message(event):
     master_users_collection.update_one(filter, newvalues)
     reply_message_to_user("Accept new model! : " + user_message)
 
+  elif user_message.startswith('@setcont'):
+    filter = {'user_id': event.source.user_id}
+    newvalues = {
+      "$set": {
+        'controlnet_model0': user_message.replace("@setcont ", ""),
+      }
+    }
+    master_users_collection.update_one(filter, newvalues)
+    reply_message_to_user("Accept new controlnet! : " + user_message)
+
   elif user_message.startswith('@upscale'):
     payload = json.dumps({
       "key": my_secret4,
@@ -490,6 +583,41 @@ def handle_message(event):
       reply_message_to_user("Upscale complete! : " + output_url)
 
   elif user_message.startswith('/img'):
+
+    #check for init_image
+    if user_message.find("http") > -1:
+      x = user_message.index("http")
+      y = user_message.index(".png")
+      z = user_message[x:y]
+      var_init_iamge = z + ".png"
+      remove_http = user_message.replace(z + ".png", "")
+      user_message = remove_http
+      urlstdapi = "https://stablediffusionapi.com/api/v4/dreambooth/img2img"
+      print(var_init_iamge)
+      print(urlstdapi)
+    else:
+      var_init_iamge = None
+
+    if user_message.find("@cont") > -1:
+      urlstdapi = "https://stablediffusionapi.com/api/v5/controlnet"
+      json_data = (master_users_collection.find_one(
+      {'user_id': event.source.user_id}, {"controlnet_model0": 1}))
+      controlnet_model0 = json_data['controlnet_model0']
+      print(controlnet_model0)
+    else:
+      controlnet_model0 = None
+
+    #check for image strength
+    if user_message.find("--str") > -1:
+      x = user_message.index("--str")
+      y = user_message[x:]
+      var_strength = (re.search(r'\d+\.\d+', y).group())
+      z = user_message.replace(y, "")
+      user_message = z
+      print(float(var_strength))
+      print(user_message)
+    else:
+      var_strength = float(0.3)
 
     #check for sefl attention
     if user_message.find("@hf") > -1:
@@ -573,7 +701,7 @@ def handle_message(event):
     else:
       # No "--no" found, set negative prompt to empty string
       negative_prompt = ""
-     
+
     # check for positive prompt
     start_index = user_message.find("/img ") + len("/img")
     end_index = user_message.find("--no ")
@@ -589,8 +717,13 @@ def handle_message(event):
     if "replytoken" in session:
       replytoken = session.get("replytoken")
       # Begin parameter for payload
+      # test controlnet name
+      print(controlnet_model0)
+      print(urlstdapi)
       payload = json.dumps({
         "key": my_secret4,
+        "controlnet_model": controlnet_model0,
+        "controlnet_type" : controlnet_model0,
         "model_id": main_model,
         "prompt": positive_prompt,
         "negative_prompt": negative_prompt,
@@ -602,10 +735,10 @@ def handle_message(event):
         "enhance_prompt": "no",
         "seed": var_seed,
         "guidance_scale": 7.5,
-        "strength": None,  #param for image2image
+        "strength": var_strength,  #param for image2image
         "lora_model": lora_model,
         "lora_strength": 0.6,  #param for image2image
-        "init_image": None,  #param for image2image/inpaint
+        "init_image": var_init_iamge,  #param for image2image/inpaint
         "mask_image": None,  #param for image2image/inpaint
         "multi_lingual": "no",
         "panorama": "no",
@@ -632,10 +765,14 @@ def handle_message(event):
         if output_status == "success":
           jsonResponse = response.json()
           image_gen_records_collection.insert_one({
-            'timestamp':timestamp,
-            'json_response':str(jsonResponse),
-            'user_id':event.source.user_id,
-            'track_id':output_id
+            'timestamp':
+            timestamp,
+            'json_response':
+            str(jsonResponse),
+            'user_id':
+            event.source.user_id,
+            'track_id':
+            output_id
           })
           output_url = jsonResponse['output'][0]
           #output_W = jsonResponse['W']
@@ -714,10 +851,14 @@ def handle_message(event):
 
           # Keep record to check start time of processing
           image_gen_records_collection.insert_one({
-            'timestamp':timestamp,
-            'json_response':str(jsonResponse),
-            'user_id':event.source.user_id,
-            'track_id':output_id
+            'timestamp':
+            timestamp,
+            'json_response':
+            str(jsonResponse),
+            'user_id':
+            event.source.user_id,
+            'track_id':
+            output_id
           })
 
           #whil loop until fetch_status <> processing
@@ -748,9 +889,8 @@ def handle_message(event):
                                        TextSendMessage(text=reply_message))
 
         else:
-          reply_message_to_user(
-            "Error please try again or select other main_model or change lora model"
-          )
+          jsonResponse = response.json()
+          reply_message_to_user(str(jsonResponse))
 
         #When error send raw json from stdapi to user
       else:
@@ -799,7 +939,8 @@ def save_message(user_id, message):
       'display_name': display_name,
       'timestamp': timestamp,
       'main_model': "midjourney",
-      'lora_model': "-"
+      'lora_model': "-",
+      'controlnet_model0': "-"
     })
 
   # Insert the document into the messages collection
