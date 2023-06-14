@@ -673,7 +673,7 @@ def handle_message(event):
       print(urlstdapi)
     else:
       var_init_iamge = None
-
+      urlstdapi = "https://stablediffusionapi.com/api/v4/dreambooth"
     if user_message.find("@cont") > -1:
       urlstdapi = "https://stablediffusionapi.com/api/v5/controlnet"
       json_data = (master_users_collection.find_one(
@@ -831,7 +831,7 @@ def handle_message(event):
         "embeddings_model": emb_model,
         "scheduler": "UniPCMultistepScheduler",
         "webhook": None,
-        "track_id": None
+        "track_id": None,
       })
 
       headers = {'Content-Type': 'application/json'}
