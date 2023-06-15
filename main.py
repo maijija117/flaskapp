@@ -25,10 +25,16 @@ my_secret2 = os.environ['LINE_SECRET']
 my_secret3 = os.environ['MONGO_DB_CONNECTION']
 my_secret4 = os.environ['STD_API_KEY']
 my_secret5 = os.environ['SESSION_SECRET_KEY']
+my_secret6 = os.environ['CHAT_GPT']
 
 headers_for_line = {
   'Content-Type': 'application/json',
   'Authorization': 'Bearer' + " " + my_secret
+}
+
+headers_for_chatgpt = {
+  'Content-Type': 'application/json',
+  'Authorization': 'Bearer' + " " + my_secret6
 }
 
 ###variable for imagegen
@@ -41,8 +47,8 @@ var_seed = 0
 var_lora = ''
 var_init_iamge = ''
 var_strength = ''
-controlnet_model0 =''
-emb_model =''
+controlnet_model0 = ''
+emb_model = ''
 
 app = Flask(__name__)
 app.config['SESSION_TYPE'] = 'filesystem'
@@ -62,6 +68,7 @@ master_users_collection = db['master_users']
 image_gen_records_collection = db['image_gen_records_collection']
 model_master_collection = db["model_master"]
 lora_and_emb_master_collection = db["lora_and_emb_master"]
+pure_message_gpt_collection = db["pure_message_gpt"]
 
 # Get the current time in Thailand timezone
 current_time = datetime.now(timezone)
@@ -112,6 +119,11 @@ def handle_message(event):
 
   elif user_message == "no":
     reply_message_to_user("why")
+
+  elif user_message.startswith('@clearchat'):
+    delete_filter = {'user_id': event.source.user_id}
+    result = pure_message_gpt_collection.delete_many(delete_filter)
+    reply_message_to_user("All chat deleted!")
 
   elif user_message.startswith('@callmopho'):
     query_condition = {
@@ -431,13 +443,15 @@ def handle_message(event):
     requests.post('https://api.line.me/v2/bot/message/reply',
                   headers=headers_for_line,
                   data=payload)
-    
+
   elif user_message.startswith('@calllora'):
     query_condition = {
-        "$or": [
-            {"GPT_LoraOrEmbedding": "Lora"},
-            {"GPT_LoraOrEmbedding": "Embedding"}]}
-
+      "$or": [{
+        "GPT_LoraOrEmbedding": "Lora"
+      }, {
+        "GPT_LoraOrEmbedding": "Embedding"
+      }]
+    }
 
     # Query data from MongoDB based on the condition
     query_result = lora_and_emb_master_collection.find(query_condition)
@@ -445,36 +459,36 @@ def handle_message(event):
     # Create an empty array to store the data
     data = []
 
-
     for item in query_result:
 
       thumbnail_image_url = item["GPT_LoraEmbedding_Image"]
       GPT_CIVmodel_name = item["title"]
       GPT_LoraEmbedding_Name = item["GPT_LoraEmbedding_Name"]
       command_type = item["command_type"]
-  
+
       new_member = {
-        "thumbnailImageUrl":thumbnail_image_url,
-        "imageBackgroundColor":"#FFFFFF",
-        "title":GPT_CIVmodel_name,
-        "text":"description",
-  
+        "thumbnailImageUrl":
+        thumbnail_image_url,
+        "imageBackgroundColor":
+        "#FFFFFF",
+        "title":
+        GPT_CIVmodel_name,
+        "text":
+        "description",
         "defaultAction": {
-        "type": "uri",
-        "label": "View detail",
-        "uri": thumbnail_image_url
+          "type": "uri",
+          "label": "View detail",
+          "uri": thumbnail_image_url
         },
-  
-          "actions": [{
-            "type": "message",
-            "label": "Set Model",
-            "text": command_type + GPT_LoraEmbedding_Name
-          }]
-  
-        	}
-  
+        "actions": [{
+          "type": "message",
+          "label": "Set Model",
+          "text": command_type + GPT_LoraEmbedding_Name
+        }]
+      }
+
       data.append(new_member)
-	
+
       payload = json.dumps({
         "replyToken":
         replytoken,
@@ -496,79 +510,74 @@ def handle_message(event):
 
   elif user_message.startswith('@callcont'):
     payload = json.dumps({
-    "replyToken": replytoken,
-    "messages": [
-    {
-      "type": "flex",
-      "altText": "Flex Message",
-      "contents": {
-        "type": "bubble",
-        "size": "micro",
-        "header": {
-          "type": "box",
-          "layout": "vertical",
-          "contents": [
-            {
+      "replyToken":
+      replytoken,
+      "messages": [{
+        "type": "flex",
+        "altText": "Flex Message",
+        "contents": {
+          "type": "bubble",
+          "size": "micro",
+          "header": {
+            "type":
+            "box",
+            "layout":
+            "vertical",
+            "contents": [{
               "type": "text",
               "text": "🕹️Controlnet_List",
               "color": "#FFFFFF",
               "size": "18px",
               "weight": "bold"
-            }
-          ],
-          "backgroundColor": "#32CD32"
-        },
-        "body": {
-          "type": "box",
-          "layout": "vertical",
-          "contents": [
-            {
+            }],
+            "backgroundColor":
+            "#32CD32"
+          },
+          "body": {
+            "type":
+            "box",
+            "layout":
+            "vertical",
+            "contents": [{
               "type": "button",
               "action": {
                 "type": "message",
                 "label": "CANNY",
                 "text": "@setcont canny"
               }
-            },
-            {
+            }, {
               "type": "button",
               "action": {
                 "type": "message",
                 "label": "DEPTH",
                 "text": "@setcont depth"
               }
-            },
-            {
+            }, {
               "type": "button",
               "action": {
                 "type": "message",
                 "label": "MLSD",
                 "text": "@setcont mlsd"
               }
-            },
-            {
+            }, {
               "type": "button",
               "action": {
                 "type": "message",
                 "label": "OPENPOSE",
                 "text": "@setcont openpose"
               }
-            },
-            {
+            }, {
               "type": "button",
               "action": {
                 "type": "message",
                 "label": "SCRIBBLE",
                 "text": "@setcont scribble"
               }
-            }
-          ]
+            }]
+          }
         }
-      }
-    }
-  ]
-}
-    )
+      }]
+    })
     requests.post('https://api.line.me/v2/bot/message/reply',
                   headers=headers_for_line,
                   data=payload)
@@ -593,29 +602,21 @@ def handle_message(event):
         "main_model": 1,
         "lora_model": 1,
         "controlnet_model0": 1,
-        "emb_model":1
+        "emb_model": 1
       })
     main_model = json_data['main_model']
     lora_model = json_data['lora_model']
     controlnet_model0 = json_data['controlnet_model0']
     emb_model = json_data['emb_model']
-    reply_message_to_user("🤖Model : " + main_model + "\n️🎚️lora_model : " +     lora_model + "\n🎚️emb_model :" + emb_model + "\n️🕹️control_net :" + controlnet_model0)
+    reply_message_to_user("🤖Model : " + main_model + "\n️🎚️lora_model : " +
+                          lora_model + "\n🎚️emb_model :" + emb_model +
+                          "\n️🕹️control_net :" + controlnet_model0)
 
   elif user_message.startswith('@setmodel'):
     filter = {'user_id': event.source.user_id}
     newvalues = {
       "$set": {
         'main_model': user_message.replace("@setmodel ", "")
-      }
-    }
-    master_users_collection.update_one(filter, newvalues)
-    reply_message_to_user("Accept new model! : " + user_message)
-
-  elif user_message.startswith('@setlora'):
-    filter = {'user_id': event.source.user_id}
-    newvalues = {
-      "$set": {
-        'lora_model': user_message.replace("@setlora ", ""),
       }
     }
     master_users_collection.update_one(filter, newvalues)
@@ -640,6 +641,12 @@ def handle_message(event):
     }
     master_users_collection.update_one(filter, newvalues)
     reply_message_to_user("Accept new controlnet! : " + user_message)
+
+  elif user_message.startswith('@clearlora_emb'):
+    filter = {'user_id': event.source.user_id}
+    newvalues = {"$set": {'lora_model': "-", 'emb_model': "-"}}
+    master_users_collection.update_one(filter, newvalues)
+    reply_message_to_user("Clear lora and embedding!")
 
   elif user_message.startswith('@upscale'):
     payload = json.dumps({
@@ -677,7 +684,7 @@ def handle_message(event):
     if user_message.find("@cont") > -1:
       urlstdapi = "https://stablediffusionapi.com/api/v5/controlnet"
       json_data = (master_users_collection.find_one(
-      {'user_id': event.source.user_id}, {"controlnet_model0": 1}))
+        {'user_id': event.source.user_id}, {"controlnet_model0": 1}))
       controlnet_model0 = json_data['controlnet_model0']
       print(controlnet_model0)
     else:
@@ -765,12 +772,12 @@ def handle_message(event):
     # If lora in Mongo equal - this mean None for json payload
     if lora_model == "-":
       lora_model = None
-      
+
     # Set emb model
     json_data2 = (master_users_collection.find_one(
-    {'user_id': event.source.user_id}, {"emb_model": 1}))
+      {'user_id': event.source.user_id}, {"emb_model": 1}))
     emb_model = json_data2['emb_model']
-    
+
     # If lora in Mongo equal - this mean None for json payload
     if emb_model == "-":
       emb_model = None
@@ -807,7 +814,7 @@ def handle_message(event):
       payload = json.dumps({
         "key": my_secret4,
         "controlnet_model": controlnet_model0,
-        "controlnet_type" : controlnet_model0,
+        "controlnet_type": controlnet_model0,
         "model_id": main_model,
         "prompt": positive_prompt,
         "negative_prompt": negative_prompt,
@@ -987,13 +994,71 @@ def handle_message(event):
     else:
       print("Reply token not found")
 
+  #sent other message to chatgpt
   else:
-    reply_message = "I don't know"
+    #Record message to message_gpt
+    message_gpt = {
+      'user_id': event.source.user_id,
+      'message': user_message,
+      'timestamp': timestamp,
+      'gpt_role': "user"
+    }
+    pure_message_gpt_collection.insert_one(message_gpt)
+
+    #query user message to input chatgpt
+    query_condition = {"user_id": event.source.user_id}
+    query_result = pure_message_gpt_collection.find(query_condition)
+
+    # Create an empty array to store the data
+    data = [{"role": "system", "content": "You are helpul   assistant."}]
+
+    for item in query_result:
+      filtered_user_messages = item["message"]
+      filtered_role = item["gpt_role"]
+
+      new_member = {"role": filtered_role, "content": filtered_user_messages}
+
+      data.append(new_member)
+
+      payload = json.dumps({
+        "model":
+        "gpt-3.5-turbo",
+        "messages": data,
+        "temperature":
+        0.7
+      })
+
+  response = requests.post('https://api.openai.com/v1/chat/completions',headers=headers_for_chatgpt,
+  data=payload)
+  
+  print(response)
+  if response.ok:
+    # check status of ok response success or processing?
+    gpt_reply = response.json()
+    print(gpt_reply)
+    gpt_output_role = gpt_reply['choices'][0]['message']['role']
+    gpt_output_content = gpt_reply['choices'][0]['message']['content']
+
+    #record response from gpt to mongodb
+    message_gpt = {
+      'user_id': event.source.user_id,
+      'message': gpt_output_content,
+      'timestamp': timestamp,
+      'gpt_role': gpt_output_role
+    }
+    
+    pure_message_gpt_collection.insert_one(message_gpt)
+
+
+    
+    reply_message = ("🤖OnemaiGPT : ") + gpt_output_content
 
     #send reply to user
     line_bot_api.reply_message(event.reply_token,
                                TextSendMessage(text=reply_message))
-
+  else:
+    reply_message = "❗Error ลองพิมพ์ @clearchat เพื่อล้างประวัติการ chat ก่อนนะ! "+str(response)
+    
   # Save the message to MongoDB
   save_message(event.source.user_id, user_message)
 
@@ -1015,7 +1080,7 @@ def save_message(user_id, message):
       display_name = profile.display_name
     except LineBotApiError:
       # Handle error when user profile is not found
-      display_name = "Unknown"
+      display_name = "❗Unknown"
 
     # Insert the user ID and display name into the master_users collection
     master_users_collection.insert_one({
