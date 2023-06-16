@@ -47,8 +47,6 @@ var_seed = 0
 var_lora = ''
 var_init_iamge = ''
 var_strength = ''
-set_pos = ''
-set_neg = ''
 controlnet_model0 = ''
 emb_model = ''
 
@@ -624,17 +622,15 @@ def handle_message(event):
     master_users_collection.update_one(filter, newvalues)
     reply_message_to_user("Accept new model! : " + user_message)
 
-  
   elif user_message.startswith('@setlora'):
     filter = {'user_id': event.source.user_id}
     newvalues = {
       "$set": {
-        'lora_model': user_message.replace("@setlora ", "")
+        'lora_model': user_message.replace("@setlora ", ""),
       }
     }
     master_users_collection.update_one(filter, newvalues)
     reply_message_to_user("Accept new model! : " + user_message)
-  
 
   elif user_message.startswith('@setemb'):
     filter = {'user_id': event.source.user_id}
@@ -778,7 +774,6 @@ def handle_message(event):
       {'user_id': event.source.user_id}, {"main_model": 1}))
     main_model = json_data['main_model']
     print(main_model)
-    
     # Set lora model
     json_data1 = (master_users_collection.find_one(
       {'user_id': event.source.user_id}, {"lora_model": 1}))
@@ -788,32 +783,17 @@ def handle_message(event):
     if lora_model == "-":
       lora_model = None
 
-    # Set_pos
-    json_data1 = (master_users_collection.find_one(
-      {'user_id': event.source.user_id}, {"set_pos": 1}))
-    set_pos = json_data1['set_pos']
-    print(lora_model)
-    # If lora in Mongo equal - this mean None for json payload
-    if set_pos == "-":
-      set_pos = None
-
-    # Set_neg
-    json_data1 = (master_users_collection.find_one(
-      {'user_id': event.source.user_id}, {"set_neg": 1}))
-    set_neg = json_data1['set_neg']
-    print(lora_model)
-    # If lora in Mongo equal - this mean None for json payload
-    if set_neg == "-":
-      set_neg = None
-    
     # Set emb model
     json_data2 = (master_users_collection.find_one(
       {'user_id': event.source.user_id}, {"emb_model": 1}))
     emb_model = json_data2['emb_model']
+
     # If lora in Mongo equal - this mean None for json payload
     if emb_model == "-":
       emb_model = None
-      
+    # If not just select normal lora
+    # else:
+    #lora_model =json_data1['lora_model']
     # check for negative prompt
     index = user_message.find("--no ")
     if index != -1:
@@ -846,8 +826,8 @@ def handle_message(event):
         "controlnet_model": controlnet_model0,
         "controlnet_type": controlnet_model0,
         "model_id": main_model,
-        "prompt": set_pos + positive_prompt +", sfw",
-        "negative_prompt": set_neg + negative_prompt +", nsfw" ,
+        "prompt": positive_prompt,
+        "negative_prompt": negative_prompt,
         "width": var_width,
         "height": var_height,
         "samples": "1",
@@ -862,7 +842,6 @@ def handle_message(event):
         "init_image": var_init_iamge,  #param for image2image/inpaint
         "mask_image": None,  #param for image2image/inpaint
         "multi_lingual": "no",
-        "clip_skip" : 1,
         "panorama": "no",
         "self_attention": var_self_attention,
         "upscale": "no",
@@ -1059,36 +1038,36 @@ def handle_message(event):
         0.7
       })
 
-      response = requests.post('https://api.openai.com/v1/chat/completions',headers=headers_for_chatgpt,
-      data=payload)
+  response = requests.post('https://api.openai.com/v1/chat/completions',headers=headers_for_chatgpt,
+  data=payload)
   
-      print(response)
-    if response.ok:
-      # check status of ok response success or processing?
-      gpt_reply = response.json()
-      print(gpt_reply)
-      gpt_output_role = gpt_reply['choices'][0]['message']['role']
-      gpt_output_content = gpt_reply['choices'][0]['message']['content']
-  
-      #record response from gpt to mongodb
-      message_gpt = {
-        'user_id': event.source.user_id,
-        'message': gpt_output_content,
-        'timestamp': timestamp,
-        'gpt_role': gpt_output_role
-      }
-      
-      pure_message_gpt_collection.insert_one(message_gpt)
-  
-  
-      
-      reply_message = ("🤖OnemaiGPT : ") + gpt_output_content
-  
-      #send reply to user
-      line_bot_api.reply_message(event.reply_token,
-                                 TextSendMessage(text=reply_message))
-    else:
-      reply_message = "❗Error ลองพิมพ์ @clearchat เพื่อล้างประวัติการ chat ก่อนนะ! "+str(response)
+  print(response)
+  if response.ok:
+    # check status of ok response success or processing?
+    gpt_reply = response.json()
+    print(gpt_reply)
+    gpt_output_role = gpt_reply['choices'][0]['message']['role']
+    gpt_output_content = gpt_reply['choices'][0]['message']['content']
+
+    #record response from gpt to mongodb
+    message_gpt = {
+      'user_id': event.source.user_id,
+      'message': gpt_output_content,
+      'timestamp': timestamp,
+      'gpt_role': gpt_output_role
+    }
+    
+    pure_message_gpt_collection.insert_one(message_gpt)
+
+
+    
+    reply_message = ("🤖OnemaiGPT : ") + gpt_output_content
+
+    #send reply to user
+    line_bot_api.reply_message(event.reply_token,
+                               TextSendMessage(text=reply_message))
+  else:
+    reply_message = "❗Error ลองพิมพ์ @clearchat เพื่อล้างประวัติการ chat ก่อนนะ! "+str(response)
     
   # Save the message to MongoDB
   save_message(event.source.user_id, user_message)
@@ -1120,9 +1099,7 @@ def save_message(user_id, message):
       'timestamp': timestamp,
       'main_model': "midjourney",
       'lora_model': "-",
-      'controlnet_model0': "-",
-      'set_pos': "-",
-      'set_neg': "-"
+      'controlnet_model0': "-"
     })
 
   # Insert the document into the messages collection
