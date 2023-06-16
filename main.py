@@ -20,8 +20,8 @@ url_upscale = "https://stablediffusionapi.com/api/v3/super_resolution"
 # Set the timezone to Thailand
 timezone = pytz.timezone("Asia/Bangkok")
 
-my_secret = os.environ['LINE_ACCESS_TOKEN']
-my_secret2 = os.environ['LINE_SECRET']
+my_secret = os.environ['Test_LINE_ACCESS_TOKEN']
+my_secret2 = os.environ['Test_LINE_SECRET']
 my_secret3 = os.environ['MONGO_DB_CONNECTION']
 my_secret4 = os.environ['STD_API_KEY']
 my_secret5 = os.environ['SESSION_SECRET_KEY']
@@ -1038,36 +1038,36 @@ def handle_message(event):
         0.7
       })
 
-  response = requests.post('https://api.openai.com/v1/chat/completions',headers=headers_for_chatgpt,
-  data=payload)
+    response = requests.post('https://api.openai.com/v1/chat/completions',headers=headers_for_chatgpt,
+    data=payload)
   
-  print(response)
-  if response.ok:
-    # check status of ok response success or processing?
-    gpt_reply = response.json()
-    print(gpt_reply)
-    gpt_output_role = gpt_reply['choices'][0]['message']['role']
-    gpt_output_content = gpt_reply['choices'][0]['message']['content']
-
-    #record response from gpt to mongodb
-    message_gpt = {
-      'user_id': event.source.user_id,
-      'message': gpt_output_content,
-      'timestamp': timestamp,
-      'gpt_role': gpt_output_role
-    }
-    
-    pure_message_gpt_collection.insert_one(message_gpt)
-
-
-    
-    reply_message = ("🤖OnemaiGPT : ") + gpt_output_content
-
-    #send reply to user
-    line_bot_api.reply_message(event.reply_token,
-                               TextSendMessage(text=reply_message))
-  else:
-    reply_message = "❗Error ลองพิมพ์ @clearchat เพื่อล้างประวัติการ chat ก่อนนะ! "+str(response)
+    print(response)
+    if response.ok:
+      # check status of ok response success or processing?
+      gpt_reply = response.json()
+      print(gpt_reply)
+      gpt_output_role = gpt_reply['choices'][0]['message']['role']
+      gpt_output_content = gpt_reply['choices'][0]['message']['content']
+  
+      #record response from gpt to mongodb
+      message_gpt = {
+        'user_id': event.source.user_id,
+        'message': gpt_output_content,
+        'timestamp': timestamp,
+        'gpt_role': gpt_output_role
+      }
+      
+      pure_message_gpt_collection.insert_one(message_gpt)
+  
+  
+      
+      reply_message = ("🤖OnemaiGPT : ") + gpt_output_content
+  
+      #send reply to user
+      line_bot_api.reply_message(event.reply_token,
+                                 TextSendMessage(text=reply_message))
+    else:
+      reply_message = "❗Error ลองพิมพ์ @clearchat เพื่อล้างประวัติการ chat ก่อนนะ! "+str(response)
     
   # Save the message to MongoDB
   save_message(event.source.user_id, user_message)
