@@ -193,6 +193,7 @@ def handle_message(event):
       image_url = upload_image(message_id, buffer)
 
       if "replytoken" in session:
+        replytoken = session.get("replytoken")
         # Create an empty array to store the data
         i = 0
         while i < 3:
