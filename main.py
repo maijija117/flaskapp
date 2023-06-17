@@ -3,7 +3,7 @@ from flask_session import Session
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError, LineBotApiError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage, StickerSendMessage, TemplateSendMessage, ButtonsTemplate, PostbackAction, MessageAction, URIAction
-from pymongo import MongoClient
+from pymongo import MongoClient, UpdateMany
 from datetime import datetime
 import json
 import pytz
@@ -11,6 +11,15 @@ import os
 import requests
 import time
 import re
+
+
+##############################################################################
+###Warning! Please careful when deploy. Always check 4 things before deplopy###
+#1 Check line access token  not test version
+#2 Check line secret key token not test version
+#3 Mongodb not test version
+#4 Make sure no Bug!!
+##############################################################################
 
 # StableDiffAPI Url
 urlstdapi = "https://stablediffusionapi.com/api/v4/dreambooth"
@@ -20,8 +29,8 @@ url_upscale = "https://stablediffusionapi.com/api/v3/super_resolution"
 # Set the timezone to Thailand
 timezone = pytz.timezone("Asia/Bangkok")
 
-my_secret = os.environ['Test_LINE_ACCESS_TOKEN']
-my_secret2 = os.environ['Test_LINE_SECRET']
+my_secret = os.environ['Test_LINE_ACCESS_TOKEN'] #1 Check line access token  not test version
+my_secret2 = os.environ['Test_LINE_SECRET'] #2 Check line secret key token not test version
 my_secret3 = os.environ['MONGO_DB_CONNECTION']
 my_secret4 = os.environ['STD_API_KEY']
 my_secret5 = os.environ['SESSION_SECRET_KEY']
@@ -49,6 +58,8 @@ var_init_iamge = ''
 var_strength = ''
 controlnet_model0 = ''
 emb_model = ''
+set_pos =''
+set_neg =''
 
 app = Flask(__name__)
 app.config['SESSION_TYPE'] = 'filesystem'
@@ -62,7 +73,7 @@ handler = WebhookHandler(my_secret2)
 client = MongoClient(my_secret3)
 
 # Specify the database and collection
-db = client['line_bot_database']
+db = client['test_line_bot_database'] #3 Mongodb not test version
 messages_collection = db['messages']
 master_users_collection = db['master_users']
 image_gen_records_collection = db['image_gen_records_collection']
@@ -102,7 +113,7 @@ def handle_message(event):
   user_message = event.message.text
   global reply_message
   global payload
-  # to save user_id in lineUserId var for sendding push message
+
   # Retrieve the reply token from the session data or generate a new one
   replytoken = session.get("replytoken")
   if replytoken is None:
@@ -116,6 +127,24 @@ def handle_message(event):
   # Check the user's message and set the appropriate reply message
   if user_message == "hi":
     reply_message_to_user("Good morning")
+
+  
+  ##############################################################################
+  ###This command is to reset new value when update new function to OnemaiGPT###
+  ##############################################################################
+  elif user_message.startswith('@106472@97221'):
+    # Define the update criteria
+    filter_criteria = {}
+    # Define the update operation
+    update_operation = {'$set': {'set_pos': '-','set_neg': '-'}}
+    # Create an UpdateMany object
+    update_many = UpdateMany(filter_criteria, update_operation)
+    # Execute the update operation
+    result = master_users_collection.bulk_write([update_many])
+    reply_message_to_user("Update success!")
+
+
+  
 
   elif user_message == "no":
     reply_message_to_user("why")
@@ -602,15 +631,23 @@ def handle_message(event):
         "main_model": 1,
         "lora_model": 1,
         "controlnet_model0": 1,
-        "emb_model": 1
+        "emb_model": 1,
+        "set_pos":1,
+        "set_neg":1
       })
     main_model = json_data['main_model']
     lora_model = json_data['lora_model']
     controlnet_model0 = json_data['controlnet_model0']
     emb_model = json_data['emb_model']
-    reply_message_to_user("🤖Model : " + main_model + "\n️🎚️lora_model : " +
-                          lora_model + "\n🎚️emb_model :" + emb_model +
-                          "\n️🕹️control_net :" + controlnet_model0)
+    pos_result = json_data['set_pos']
+    neg_result = json_data['set_neg']
+    reply_message_to_user("🤖Model : " + main_model 
+                          + "\n️🎚️lora_model : " 
+                          + lora_model + "\n🎚️emb_model :" 
+                          + emb_model +"\n️🕹️control_net :" 
+                          + controlnet_model0 +"\n️✅set_pos :" 
+                          + pos_result +"\n️🚫set_neg :" 
+                          + neg_result)
 
   elif user_message.startswith('@setmodel'):
     filter = {'user_id': event.source.user_id}
@@ -651,10 +688,30 @@ def handle_message(event):
     }
     master_users_collection.update_one(filter, newvalues)
     reply_message_to_user("Accept new controlnet! : " + user_message)
+    
+  elif user_message.startswith('@setpos'):
+    filter = {'user_id': event.source.user_id}
+    newvalues = {
+      "$set": {
+        'set_pos': user_message.replace("@setpos ", "")+" ",
+      }
+    }
+    master_users_collection.update_one(filter, newvalues)
+    reply_message_to_user("Accept new setpos! : " + user_message)
+
+  elif user_message.startswith('@setneg'):
+    filter = {'user_id': event.source.user_id}
+    newvalues = {
+      "$set": {
+        'set_neg': user_message.replace("@setneg ", ""),
+      }
+    }
+    master_users_collection.update_one(filter, newvalues)
+    reply_message_to_user("Accept new setneg! : " + user_message)
 
   elif user_message.startswith('@clearlora_emb'):
     filter = {'user_id': event.source.user_id}
-    newvalues = {"$set": {'lora_model': "-", 'emb_model': "-"}}
+    newvalues = {"$set": {'lora_model': "-", 'emb_model': "-", 'set_pos': "-", 'set_neg': "-"}}
     master_users_collection.update_one(filter, newvalues)
     reply_message_to_user("Clear lora and embedding!")
 
@@ -795,6 +852,22 @@ def handle_message(event):
     # else:
     #lora_model =json_data1['lora_model']
     # check for negative prompt
+        #check set_pos
+    json_data3 = (master_users_collection.find_one(
+      {'user_id': event.source.user_id}, {"set_pos": 1}))
+    set_pos = json_data3['set_pos']
+    # If lora in Mongo equal - this mean None for json payload
+    if set_pos == "-":
+      set_pos = ""   
+
+    #check set_neg
+    json_data4 = (master_users_collection.find_one(
+      {'user_id': event.source.user_id}, {"set_neg": 1}))
+    set_neg = json_data4['set_neg']
+    # If lora in Mongo equal - this mean None for json payload
+    if set_neg == "-":
+      set_neg = "" 
+
     index = user_message.find("--no ")
     if index != -1:
       # Extract the negative prompt
@@ -826,8 +899,8 @@ def handle_message(event):
         "controlnet_model": controlnet_model0,
         "controlnet_type": controlnet_model0,
         "model_id": main_model,
-        "prompt": positive_prompt,
-        "negative_prompt": negative_prompt,
+        "prompt": set_pos + positive_prompt + "sfw",
+        "negative_prompt": set_neg + negative_prompt + " nsfw",
         "width": var_width,
         "height": var_height,
         "samples": "1",
@@ -844,6 +917,7 @@ def handle_message(event):
         "multi_lingual": "no",
         "panorama": "no",
         "self_attention": var_self_attention,
+        "clip_skip":2,
         "upscale": "no",
         "embeddings_model": emb_model,
         "scheduler": "UniPCMultistepScheduler",
@@ -1099,7 +1173,9 @@ def save_message(user_id, message):
       'timestamp': timestamp,
       'main_model': "midjourney",
       'lora_model': "-",
-      'controlnet_model0': "-"
+      'controlnet_model0': "-",
+      'set_pos':"-",
+      'set_neg':"-"
     })
 
   # Insert the document into the messages collection
