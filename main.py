@@ -2,7 +2,7 @@ from flask import Flask, request, abort, session
 from flask_session import Session
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError, LineBotApiError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage, StickerSendMessage, TemplateSendMessage, ButtonsTemplate, PostbackAction, MessageAction, URIAction
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, StickerSendMessage, TemplateSendMessage, ButtonsTemplate, PostbackAction, MessageAction, URIAction, ImageMessage
 from pymongo import MongoClient, UpdateMany
 from datetime import datetime
 import json
@@ -11,6 +11,12 @@ import os
 import requests
 import time
 import re
+from io import BytesIO
+from PIL import Image
+import os
+import boto3
+from botocore.exceptions import ClientError
+
 
 
 ##############################################################################
@@ -35,6 +41,9 @@ my_secret3 = os.environ['MONGO_DB_CONNECTION']
 my_secret4 = os.environ['STD_API_KEY']
 my_secret5 = os.environ['SESSION_SECRET_KEY']
 my_secret6 = os.environ['CHAT_GPT']
+my_secret7 = os.environ['aws_access_key_id']
+my_secret8 = os.environ['bucket_name']
+my_secret9 = os.environ['aws_secret_access_key']
 
 headers_for_line = {
   'Content-Type': 'application/json',
@@ -65,6 +74,12 @@ app = Flask(__name__)
 app.config['SESSION_TYPE'] = 'filesystem'
 Session(app)
 app.secret_key = my_secret5
+
+###aws3control###
+aws_access_key_id = my_secret7
+aws_secret_access_key = my_secret9
+bucket_name = my_secret8  # Replace with your own bucket name
+s3_client = boto3.client('s3',aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key) # Create an S3 client
 
 line_bot_api = LineBotApi(my_secret)
 handler = WebhookHandler(my_secret2)
@@ -107,10 +122,9 @@ def callback():
 
 
 # Define a handler for the MessageEvent
-@handler.add(MessageEvent, message=TextMessage)
+@handler.add(MessageEvent, message=(ImageMessage, TextMessage))
 def handle_message(event):
-  # Retrieve the user's message and convert it to lowercase
-  user_message = event.message.text
+
   global reply_message
   global payload
 
@@ -124,6 +138,43 @@ def handle_message(event):
   print(timestamp + ": " + "input_user: " + lineUserId)
   print(timestamp + ": " + "input_reply_token: " + replytoken)
 
+  if isinstance(event.message, ImageMessage):
+    json_data = (master_users_collection.find_one(
+    {'user_id': event.source.user_id}, {"autobeauty": 1}))
+    check_beauty = str(json_data['autobeauty'])
+    
+    if check_beauty == "False":
+      print("ok1")
+      message_id = event.message.id
+      message_content = line_bot_api.get_message_content(message_id)
+  
+      print("ok2")
+      # Convert the image to PNG
+      image = Image.open(BytesIO(message_content.content))
+      image_png = image.convert("RGBA")
+  
+      print("ok3")
+      # Save the PNG image to a buffer
+      buffer = BytesIO()
+      image_png.save(buffer, "PNG")
+      buffer.seek(0)
+  
+      print("ok4")
+      # Upload the PNG image to Line and get the URL
+      image_url = upload_image(message_id, buffer)
+  
+      print(image_url)
+      # Reply to the user with the image URL
+  
+      #Below command will send 
+      line_bot_api.reply_message(event.reply_token, TextMessage(text=image_url))
+
+    else:
+      print("")
+      
+  else:
+    user_message = event.message.text
+
   # Check the user's message and set the appropriate reply message
   if user_message == "hi":
     reply_message_to_user("Good morning")
@@ -136,7 +187,7 @@ def handle_message(event):
     # Define the update criteria
     filter_criteria = {}
     # Define the update operation
-    update_operation = {'$set': {'set_pos': '-','set_neg': '-'}}
+    update_operation = {'$set': {'set_pos': '-','set_neg': '-','autobeauty': False}}
     # Create an UpdateMany object
     update_many = UpdateMany(filter_criteria, update_operation)
     # Execute the update operation
@@ -144,10 +195,30 @@ def handle_message(event):
     reply_message_to_user("Update success!")
 
 
-  
-
   elif user_message == "no":
     reply_message_to_user("why")
+
+  elif user_message == "@autobeautyon":
+    filter = {'user_id': event.source.user_id}
+    newvalues = {
+      "$set": {
+        'autobeauty': True,
+      }
+    }
+    master_users_collection.update_one(filter, newvalues)
+    reply_message_to_user("Autobeauty was turned on, please enjoy!")
+
+  elif user_message == "@autobeautyoff":
+    filter = {'user_id': event.source.user_id}
+    newvalues = {
+      "$set": {
+        'autobeauty': False,
+      }
+    }
+    master_users_collection.update_one(filter, newvalues)
+    reply_message_to_user("Autobeauty was turn off, sending image will be converted to png image url.")  
+  
+  
 
   elif user_message.startswith('@clearchat'):
     delete_filter = {'user_id': event.source.user_id}
@@ -628,6 +699,7 @@ def handle_message(event):
   elif user_message.startswith('@curset'):
     json_data = master_users_collection.find_one(
       {'user_id': event.source.user_id}, {
+        "autobeauty": 1,
         "main_model": 1,
         "lora_model": 1,
         "controlnet_model0": 1,
@@ -635,6 +707,7 @@ def handle_message(event):
         "set_pos":1,
         "set_neg":1
       })
+    autobeauty = str(json_data['autobeauty'])
     main_model = json_data['main_model']
     lora_model = json_data['lora_model']
     controlnet_model0 = json_data['controlnet_model0']
@@ -647,7 +720,8 @@ def handle_message(event):
                           + emb_model +"\n️🕹️control_net :" 
                           + controlnet_model0 +"\n️✅set_pos :" 
                           + pos_result +"\n️🚫set_neg :" 
-                          + neg_result)
+                          + neg_result +"\n💋auto_beauty :"
+                         + autobeauty)
 
   elif user_message.startswith('@setmodel'):
     filter = {'user_id': event.source.user_id}
@@ -1191,6 +1265,23 @@ def reply_processing_message(reply_message):
   replytoken = session.get("replytoken")
   line_bot_api.push_message(replytoken, lineUserId,
                             TextSendMessage(text=reply_message))
+
+def upload_image(file_name, file):
+    try:
+        #add extension to file name before upload
+        file_name = file_name + '.png'
+      
+        # Upload the file to Amazon S3
+        s3_client.upload_fileobj(file, bucket_name, file_name)
+
+        # Get the URL of the uploaded file
+        image_url = f'https://{bucket_name}.s3.amazonaws.com/{file_name}'
+
+        return image_url
+    except ClientError as e:
+        # Handle any errors that occur during the upload
+        print(e)
+        return "Error"
 
 
 if __name__ == '__main__':
