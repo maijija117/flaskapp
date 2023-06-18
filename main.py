@@ -139,243 +139,274 @@ def handle_message(event):
   print(timestamp + ": " + "input_reply_token: " + replytoken)
 
   if isinstance(event.message, ImageMessage):
-    json_data = (master_users_collection.find_one(
-    {'user_id': event.source.user_id}, {"autobeauty": 1}))
-    check_beauty = str(json_data['autobeauty'])
     
-    if check_beauty == "False":
-      print("ok1")
-      message_id = event.message.id
-      message_content = line_bot_api.get_message_content(message_id)
-  
-      print("ok2")
-      # Convert the image to PNG
-      image = Image.open(BytesIO(message_content.content))
-      image_png = image.convert("RGBA")
-  
-      print("ok3")
-      # Save the PNG image to a buffer
-      buffer = BytesIO()
-      image_png.save(buffer, "PNG")
-      buffer.seek(0)
-  
-      print("ok4")
-      # Upload the PNG image to Line and get the URL
-      image_url = upload_image(message_id, buffer)
-  
-      print(image_url)
-      # Reply to the user with the image URL
-  
-      #Below command will send 
-      line_bot_api.reply_message(event.reply_token, TextMessage(text=image_url))
+    json_data = (master_users_collection.find_one(
+    {'user_id': event.source.user_id}, {"autobeauty": 1,"upload_credit": 1}))
 
-    else:
-      print("ok1beauty")
-      message_id = event.message.id
-      message_content = line_bot_api.get_message_content(message_id)
-  
-      print("ok2beauty")
-      # Convert the image to PNG
-      image = Image.open(BytesIO(message_content.content))
-      image_png = image.convert("RGBA")
-  
-      print("ok3beauty")
-      # Save the PNG image to a buffer
-      buffer = BytesIO()
-      image_png.save(buffer, "PNG")
-      buffer.seek(0)
-  
-      print("ok4beauty")
-      # Upload the PNG image to Line and get the URL
-      image_url = upload_image(message_id, buffer)
+    #Check is credit enought to upload?
+    pull_credit = json_data['upload_credit']
+    if pull_credit < 1 :
+      reply_message_to_user("Upload credit is not enought😭, Contact admin for more credit @ https://www.facebook.com/onemaigpt/")
 
-      if "replytoken" in session:
-        replytoken = session.get("replytoken")
-        payload = json.dumps({
-          "key": my_secret4,
-          "controlnet_model": None,
-          "controlnet_type": None,
-          "model_id": "bro623jbfe32",
-          "prompt": "masterpiece portrait photography Korean girl",
-          "negative_prompt": "extra fingers, extra hands, extra arms, worst quality, bad quality, bad face, bad anatomy",
-          "width": 512,
-          "height": 768,
-          "samples": "1",
-          "num_inference_steps": 31,
-          "safety_checker": "no",
-          "enhance_prompt": "no",
-          "seed": 0,
-          "guidance_scale": 7.5,
-          "strength": 0.3,  #param for image2image
-          "lora_model": None,
-          "lora_strength": None,  #param for image2image
-          "init_image": image_url,  #param for image2image/inpaint
-          "mask_image": None,  #param for image2image/inpaint
-          "multi_lingual": "no",
-          "panorama": "no",
-          "self_attention": "no",
-          "clip_skip":2,
-          "upscale": "no",
-          "embeddings_model": None,
-          "scheduler": "UniPCMultistepScheduler",
-          "webhook": None,
-          "track_id": None,
-        })
-  
-        headers = {'Content-Type': 'application/json'}
-  
-        response = requests.post('https://stablediffusionapi.com/api/v4/dreambooth/img2img', headers=headers, data = payload)
-  
-        if response.ok:
-          # check status of ok response success or processing?
-          data = response.json()
-          #print(data)
-          output_status = data['status']
-          output_id = data.get('id')
-  
-          # if success
-          if output_status == "success":
-            jsonResponse = response.json()
-            image_gen_records_collection.insert_one({
-              'timestamp':
-              timestamp,
-              'json_response':
-              str(jsonResponse),
-              'user_id':
-              event.source.user_id,
-              'track_id':
-              output_id
-            })
-            output_url = jsonResponse['output'][0]
-            #output_W = jsonResponse['W']
-            #output_H = jsonResponse['H']
-            output_model = jsonResponse['meta']['model_id']
-            output_W = jsonResponse['meta']['W']
-            output_H = jsonResponse['meta']['H']
-            output_seed = jsonResponse['meta']['seed']
-            output_steps = jsonResponse['meta']['steps']
-            output_lora = jsonResponse['meta']['lora']
-  
-            #found bug that cannot reply None value for lora so add "-" if lora is None
-            if output_lora == None:
-              output_lora = "-"
-  
-            payload = json.dumps({
-              "replyToken":
-              replytoken,
-              "messages": [{
-                "type": "template",
-                "altText": "New image arrived!",
-                "template": {
-                  "type":
-                  "buttons",
-                  "thumbnailImageUrl":
-                  output_url,
-                  "imageAspectRatio":
-                  "square",
-                  "imageSize":
-                  "cover",
-                  "imageBackgroundColor":
-                  "#FFFFFF",
-                  "title":
-                  "Model : " + output_model,
-                  "text":
-                  "Steps : " + str(output_steps) + " Id : " + str(output_id),
-                  "defaultAction": {
-                    "type": "uri",
-                    "label": "test",
-                    "uri": output_url
-                  },
-                  "actions": [{
-                    "type": "uri",
-                    "label": "L : " + output_lora,
-                    "uri": output_url
-                  }, {
-                    "type": "message",
-                    "label": "Upscale",
-                    "text": "@upscale " + output_url
-                  }, {
-                    "type":
-                    "uri",
-                    "label":
-                    "Size : " + str(output_W) + " * " + str(output_H),
-                    "uri":
-                    output_url
-                  }, {
-                    "type": "message",
-                    "label": "Seed_No : " + str(output_seed),
-                    "text": "@check " + str(output_id)
-                  }]
-                }
-              }]
-            })
-            print(timestamp + ": " + "image_completed_for_user: " + lineUserId)
-            print(timestamp + ": " + "image_completed_for_reply_token: " +
-                  replytoken)
-            requests.post('https://api.line.me/v2/bot/message/reply',
-                          headers=headers_for_line,
-                          data=payload)
-  
-          #if else, possible to be processing
-          elif output_status == "processing":
-            print("Entering processing")
-            jsonResponse = response.json()
-            fetch_status = jsonResponse['status']
-  
-            # Keep record to check start time of processing
-            image_gen_records_collection.insert_one({
-              'timestamp':
-              timestamp,
-              'json_response':
-              str(jsonResponse),
-              'user_id':
-              event.source.user_id,
-              'track_id':
-              output_id
-            })
-  
-            #whil loop until fetch_status <> processing
-            while fetch_status == "processing":
-              #wait until 60 second, then fetch data
-              time.sleep(15)
-              payload = json.dumps({"key": my_secret4, "request_id": output_id})
-              headers = {'Content-Type': 'application/json'}
-              #Keep response value
-              fetch_response = requests.request("POST",
-                                                url_fetch,
-                                                headers=headers,
-                                                data=payload)
-              #parse json
-              json_fetch_reponse = fetch_response.json()
-              fetch_status = json_fetch_reponse['status']
-              #select json portion
-          
-            else:
-              output_fetch_url = json_fetch_reponse['output'][0]
-              #exit from while then return final result
-              reply_message = output_fetch_url + " : " + str(output_id)
-  
-              #exit from while then return final result
-              print("image_completed_for_user: " + lineUserId)
-              print("image_completed_for_reply_token: " + replytoken)
-              print("result come after processing pending")
-              line_bot_api.reply_message(event.reply_token,
-                                         TextSendMessage(text=reply_message))
-  
-          else:
-            jsonResponse = response.json()
-            reply_message_to_user(str(jsonResponse))
-  
-          #When error send raw json from stdapi to user
-        else:
-          jsonResponse = response.json()
-          #terminal inform error
-          print("error")
-          #send reply to user
-          reply_message_to_user(str(jsonResponse))
+    #Accept for next process
+    else :
+      check_beauty = str(json_data['autobeauty'])
+      
+      if check_beauty == "False":
+        print("ok1")
+        message_id = event.message.id
+        message_content = line_bot_api.get_message_content(message_id)
+    
+        print("ok2")
+        # Convert the image to PNG
+        image = Image.open(BytesIO(message_content.content))
+        image_png = image.convert("RGBA")
+    
+        print("ok3")
+        # Save the PNG image to a buffer
+        buffer = BytesIO()
+        image_png.save(buffer, "PNG")
+        buffer.seek(0)
+    
+        print("ok4")
+        # Upload the PNG image to Line and get the URL
+        image_url = upload_image(message_id, buffer)
+    
+        print(image_url)
+        
+        #deduct credit
+        pull_credit -= 1
+        print(pull_credit)
+        newvalues = {
+          "$set": {
+            'upload_credit': pull_credit
+          }
+        }
+        master_users_collection.update_one(json_data, newvalues)
+        
+    
+        #Below command will send back image url
+        line_bot_api.reply_message(event.reply_token, TextMessage(text=image_url))
   
       else:
-        print("Reply token not found")
+        print("ok1beauty")
+        message_id = event.message.id
+        message_content = line_bot_api.get_message_content(message_id)
+    
+        print("ok2beauty")
+        # Convert the image to PNG
+        image = Image.open(BytesIO(message_content.content))
+        image_png = image.convert("RGBA")
+    
+        print("ok3beauty")
+        # Save the PNG image to a buffer
+        buffer = BytesIO()
+        image_png.save(buffer, "PNG")
+        buffer.seek(0)
+    
+        print("ok4beauty")
+        # Upload the PNG image to Line and get the URL
+        image_url = upload_image(message_id, buffer)
+  
+        if "replytoken" in session:
+          replytoken = session.get("replytoken")
+          payload = json.dumps({
+            "key": my_secret4,
+            "controlnet_model": None,
+            "controlnet_type": None,
+            "model_id": "bro623jbfe32",
+            "prompt": "masterpiece portrait photography Korean girl",
+            "negative_prompt": "extra fingers, extra hands, extra arms, worst quality, bad quality, bad face, bad anatomy",
+            "width": 512,
+            "height": 768,
+            "samples": "1",
+            "num_inference_steps": 31,
+            "safety_checker": "no",
+            "enhance_prompt": "no",
+            "seed": 0,
+            "guidance_scale": 7.5,
+            "strength": 0.3,  #param for image2image
+            "lora_model": None,
+            "lora_strength": None,  #param for image2image
+            "init_image": image_url,  #param for image2image/inpaint
+            "mask_image": None,  #param for image2image/inpaint
+            "multi_lingual": "no",
+            "panorama": "no",
+            "self_attention": "no",
+            "clip_skip":2,
+            "upscale": "no",
+            "embeddings_model": None,
+            "scheduler": "UniPCMultistepScheduler",
+            "webhook": None,
+            "track_id": None,
+          })
+    
+          headers = {'Content-Type': 'application/json'}
+    
+          response = requests.post('https://stablediffusionapi.com/api/v4/dreambooth/img2img', headers=headers, data = payload)
+    
+          if response.ok:
+            # check status of ok response success or processing?
+            data = response.json()
+            #print(data)
+            output_status = data['status']
+            output_id = data.get('id')
+    
+            # if success
+            if output_status == "success":
+              jsonResponse = response.json()
+              image_gen_records_collection.insert_one({
+                'timestamp':
+                timestamp,
+                'json_response':
+                str(jsonResponse),
+                'user_id':
+                event.source.user_id,
+                'track_id':
+                output_id
+              })
+              output_url = jsonResponse['output'][0]
+              #output_W = jsonResponse['W']
+              #output_H = jsonResponse['H']
+              output_model = jsonResponse['meta']['model_id']
+              output_W = jsonResponse['meta']['W']
+              output_H = jsonResponse['meta']['H']
+              output_seed = jsonResponse['meta']['seed']
+              output_steps = jsonResponse['meta']['steps']
+              output_lora = jsonResponse['meta']['lora']
+    
+              #found bug that cannot reply None value for lora so add "-" if lora is None
+              if output_lora == None:
+                output_lora = "-"
+    
+              payload = json.dumps({
+                "replyToken":
+                replytoken,
+                "messages": [{
+                  "type": "template",
+                  "altText": "New image arrived!",
+                  "template": {
+                    "type":
+                    "buttons",
+                    "thumbnailImageUrl":
+                    output_url,
+                    "imageAspectRatio":
+                    "square",
+                    "imageSize":
+                    "cover",
+                    "imageBackgroundColor":
+                    "#FFFFFF",
+                    "title":
+                    "Model : " + output_model,
+                    "text":
+                    "Steps : " + str(output_steps) + " Id : " + str(output_id),
+                    "defaultAction": {
+                      "type": "uri",
+                      "label": "test",
+                      "uri": output_url
+                    },
+                    "actions": [{
+                      "type": "uri",
+                      "label": "L : " + output_lora,
+                      "uri": output_url
+                    }, {
+                      "type": "message",
+                      "label": "Upscale",
+                      "text": "@upscale " + output_url
+                    }, {
+                      "type":
+                      "uri",
+                      "label":
+                      "Size : " + str(output_W) + " * " + str(output_H),
+                      "uri":
+                      output_url
+                    }, {
+                      "type": "message",
+                      "label": "Seed_No : " + str(output_seed),
+                      "text": "@check " + str(output_id)
+                    }]
+                  }
+                }]
+              })
+              print(timestamp + ": " + "image_completed_for_user: " + lineUserId)
+              print(timestamp + ": " + "image_completed_for_reply_token: " +
+                    replytoken)
+              
+              #deduct credit
+              pull_credit -= 1
+              print(pull_credit)
+              newvalues = {"$set": {'upload_credit': pull_credit}}
+              
+              master_users_collection.update_one(json_data, newvalues)
+              requests.post('https://api.line.me/v2/bot/message/reply',headers=headers_for_line,data=payload)
+    
+            #if else, possible to be processing
+            elif output_status == "processing":
+              print("Entering processing")
+              jsonResponse = response.json()
+              fetch_status = jsonResponse['status']
+    
+              # Keep record to check start time of processing
+              image_gen_records_collection.insert_one({
+                'timestamp':
+                timestamp,
+                'json_response':
+                str(jsonResponse),
+                'user_id':
+                event.source.user_id,
+                'track_id':
+                output_id
+              })
+    
+              #whil loop until fetch_status <> processing
+              while fetch_status == "processing":
+                #wait until 60 second, then fetch data
+                time.sleep(15)
+                payload = json.dumps({"key": my_secret4, "request_id": output_id})
+                headers = {'Content-Type': 'application/json'}
+                #Keep response value
+                fetch_response = requests.request("POST",
+                                                  url_fetch,
+                                                  headers=headers,
+                                                  data=payload)
+                #parse json
+                json_fetch_reponse = fetch_response.json()
+                fetch_status = json_fetch_reponse['status']
+                #select json portion
+            
+              else:
+                output_fetch_url = json_fetch_reponse['output'][0]
+                #exit from while then return final result
+                reply_message = output_fetch_url + " : " + str(output_id)
+    
+                #exit from while then return final result
+                print("image_completed_for_user: " + lineUserId)
+                print("image_completed_for_reply_token: " + replytoken)
+                print("result come after processing pending")
+
+                #deduct credit
+                pull_credit -= 1
+                print(pull_credit)
+                newvalues = {"$set": {'upload_credit': pull_credit}}
+
+                #send result to user
+                line_bot_api.reply_message(event.reply_token,
+                                           TextSendMessage(text=reply_message))
+    
+            else:
+              jsonResponse = response.json()
+              reply_message_to_user(str(jsonResponse))
+    
+            #When error send raw json from stdapi to user
+          else:
+            jsonResponse = response.json()
+            #terminal inform error
+            print("error")
+            #send reply to user
+            reply_message_to_user(str(jsonResponse))
+    
+        else:
+          print("Reply token not found")
   
   
 
@@ -395,7 +426,7 @@ def handle_message(event):
       # Define the update criteria
       filter_criteria = {}
       # Define the update operation
-      update_operation = {'$set': {'set_pos': '-','set_neg': '-','autobeauty': False}}
+      update_operation = {'$set': {'set_pos': '-','set_neg': '-','autobeauty': True,'upload_credit':3}}
       # Create an UpdateMany object
       update_many = UpdateMany(filter_criteria, update_operation)
       # Execute the update operation
@@ -913,7 +944,8 @@ def handle_message(event):
           "controlnet_model0": 1,
           "emb_model": 1,
           "set_pos":1,
-          "set_neg":1
+          "set_neg":1,
+          "upload_credit":1
         })
       autobeauty = str(json_data['autobeauty'])
       main_model = json_data['main_model']
@@ -922,6 +954,7 @@ def handle_message(event):
       emb_model = json_data['emb_model']
       pos_result = json_data['set_pos']
       neg_result = json_data['set_neg']
+      upload_credit = str(json_data['upload_credit'])
       reply_message_to_user("🤖Model : " + main_model 
                             + "\n️🎚️lora_model : " 
                             + lora_model + "\n🎚️emb_model :" 
@@ -929,7 +962,8 @@ def handle_message(event):
                             + controlnet_model0 +"\n️✅set_pos :" 
                             + pos_result +"\n️🚫set_neg :" 
                             + neg_result +"\n💋auto_beauty :"
-                           + autobeauty)
+                           + autobeauty +"\n📤upload_credit :"
+                           + upload_credit)
   
     elif user_message.startswith('@setmodel'):
       filter = {'user_id': event.source.user_id}
