@@ -17,8 +17,6 @@ import os
 import boto3
 from botocore.exceptions import ClientError
 
-
-
 ##############################################################################
 ###Warning! Please careful when deploy. Always check 4 things before deplopy###
 #1 Check line access token  not test version
@@ -35,8 +33,8 @@ url_upscale = "https://stablediffusionapi.com/api/v3/super_resolution"
 # Set the timezone to Thailand
 timezone = pytz.timezone("Asia/Bangkok")
 
-my_secret = os.environ['Test_LINE_ACCESS_TOKEN'] #1 Check line access token  not test version
-my_secret2 = os.environ['Test_LINE_SECRET'] #2 Check line secret key token not test version
+my_secret = os.environ['LINE_ACCESS_TOKEN']  #1 Check line access token  not test version
+my_secret2 = os.environ['LINE_SECRET']  #2 Check line secret key token not test version
 my_secret3 = os.environ['MONGO_DB_CONNECTION']
 my_secret4 = os.environ['STD_API_KEY']
 my_secret5 = os.environ['SESSION_SECRET_KEY']
@@ -69,8 +67,8 @@ var_init_iamge = ''
 var_strength = ''
 controlnet_model0 = ''
 emb_model = ''
-set_pos =''
-set_neg =''
+set_pos = ''
+set_neg = ''
 
 app = Flask(__name__)
 app.config['SESSION_TYPE'] = 'filesystem'
@@ -81,7 +79,10 @@ app.secret_key = my_secret5
 aws_access_key_id = my_secret7
 aws_secret_access_key = my_secret9
 bucket_name = my_secret8  # Replace with your own bucket name
-s3_client = boto3.client('s3',aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key) # Create an S3 client
+s3_client = boto3.client(
+  's3',
+  aws_access_key_id=aws_access_key_id,
+  aws_secret_access_key=aws_secret_access_key)  # Create an S3 client
 
 line_bot_api = LineBotApi(my_secret)
 handler = WebhookHandler(my_secret2)
@@ -90,15 +91,15 @@ handler = WebhookHandler(my_secret2)
 client = MongoClient(my_secret3)
 
 # Specify the database and collection
-db = client['test_line_bot_database'] #3 Mongodb not test version
+db = client['line_bot_database']  #3 Mongodb not test version
 messages_collection = db['messages']
 master_users_collection = db['master_users']
 image_gen_records_collection = db['image_gen_records_collection']
 model_master_collection = db["model_master"]
 lora_and_emb_master_collection = db["lora_and_emb_master"]
 pure_message_gpt_collection = db["pure_message_gpt"]
-payment_collection =db["payment"]
-credit_refill_collection = db ["credit_refill"]
+payment_collection = db["payment"]
+credit_refill_collection = db["credit_refill"]
 
 # Get the current time in Thailand timezone
 current_time = datetime.now(timezone)
@@ -143,75 +144,76 @@ def handle_message(event):
   print(timestamp + ": " + "input_reply_token: " + replytoken)
 
   if isinstance(event.message, ImageMessage):
-    
+
     json_data = (master_users_collection.find_one(
-    {'user_id': event.source.user_id}, {"autobeauty": 1,"upload_credit": 1}))
+      {'user_id': event.source.user_id}, {
+        "autobeauty": 1,
+        "upload_credit": 1
+      }))
 
     #Check is credit enought to upload?
     pull_credit = json_data['upload_credit']
-    if pull_credit < 1 :
-      reply_message_to_user("Upload credit is not enought😭, Contact admin for more credit @ https://www.facebook.com/onemaigpt/")
+    if pull_credit < 1:
+      reply_message_to_user(
+        "Upload credit is not enought😭, Contact admin for more credit @ https://www.facebook.com/onemaigpt/"
+      )
 
     #Accept for next process
-    else :
+    else:
       check_beauty = str(json_data['autobeauty'])
-      
+
       if check_beauty == "False":
         print("ok1")
         message_id = event.message.id
         message_content = line_bot_api.get_message_content(message_id)
-    
+
         print("ok2")
         # Convert the image to PNG
         image = Image.open(BytesIO(message_content.content))
         image_png = image.convert("RGBA")
-    
+
         print("ok3")
         # Save the PNG image to a buffer
         buffer = BytesIO()
         image_png.save(buffer, "PNG")
         buffer.seek(0)
-    
+
         print("ok4")
         # Upload the PNG image to Line and get the URL
         image_url = upload_image(message_id, buffer)
-    
+
         print(image_url)
-        
+
         #deduct credit
         pull_credit -= 1
         print(pull_credit)
-        newvalues = {
-          "$set": {
-            'upload_credit': pull_credit
-          }
-        }
+        newvalues = {"$set": {'upload_credit': pull_credit}}
         master_users_collection.update_one(json_data, newvalues)
-        
-    
+
         #Below command will send back image url
-        line_bot_api.reply_message(event.reply_token, TextMessage(text=image_url))
-  
+        line_bot_api.reply_message(event.reply_token,
+                                   TextMessage(text=image_url))
+
       else:
         print("ok1beauty")
         message_id = event.message.id
         message_content = line_bot_api.get_message_content(message_id)
-    
+
         print("ok2beauty")
         # Convert the image to PNG
         image = Image.open(BytesIO(message_content.content))
         image_png = image.convert("RGBA")
-    
+
         print("ok3beauty")
         # Save the PNG image to a buffer
         buffer = BytesIO()
         image_png.save(buffer, "PNG")
         buffer.seek(0)
-    
+
         print("ok4beauty")
         # Upload the PNG image to Line and get the URL
         image_url = upload_image(message_id, buffer)
-  
+
         if "replytoken" in session:
           replytoken = session.get("replytoken")
           payload = json.dumps({
@@ -220,7 +222,8 @@ def handle_message(event):
             "controlnet_type": None,
             "model_id": "bro623jbfe32",
             "prompt": "masterpiece portrait photography Korean girl",
-            "negative_prompt": "extra fingers, extra hands, extra arms, worst quality, bad quality, bad face, bad anatomy",
+            "negative_prompt":
+            "extra fingers, extra hands, extra arms, worst quality, bad quality, bad face, bad anatomy",
             "width": 512,
             "height": 768,
             "samples": "1",
@@ -237,25 +240,28 @@ def handle_message(event):
             "multi_lingual": "no",
             "panorama": "no",
             "self_attention": "no",
-            "clip_skip":2,
+            "clip_skip": 2,
             "upscale": "no",
             "embeddings_model": None,
             "scheduler": "UniPCMultistepScheduler",
             "webhook": None,
             "track_id": None,
           })
-    
+
           headers = {'Content-Type': 'application/json'}
-    
-          response = requests.post('https://stablediffusionapi.com/api/v4/dreambooth/img2img', headers=headers, data = payload)
-    
+
+          response = requests.post(
+            'https://stablediffusionapi.com/api/v4/dreambooth/img2img',
+            headers=headers,
+            data=payload)
+
           if response.ok:
             # check status of ok response success or processing?
             data = response.json()
             #print(data)
             output_status = data['status']
             output_id = data.get('id')
-    
+
             # if success
             if output_status == "success":
               jsonResponse = response.json()
@@ -278,11 +284,11 @@ def handle_message(event):
               output_seed = jsonResponse['meta']['seed']
               output_steps = jsonResponse['meta']['steps']
               output_lora = jsonResponse['meta']['lora']
-    
+
               #found bug that cannot reply None value for lora so add "-" if lora is None
               if output_lora == None:
                 output_lora = "-"
-    
+
               payload = json.dumps({
                 "replyToken":
                 replytoken,
@@ -332,24 +338,27 @@ def handle_message(event):
                   }
                 }]
               })
-              print(timestamp + ": " + "image_completed_for_user: " + lineUserId)
+              print(timestamp + ": " + "image_completed_for_user: " +
+                    lineUserId)
               print(timestamp + ": " + "image_completed_for_reply_token: " +
                     replytoken)
-              
+
               #deduct credit
               pull_credit -= 1
               print(pull_credit)
               newvalues = {"$set": {'upload_credit': pull_credit}}
-              
+
               master_users_collection.update_one(json_data, newvalues)
-              requests.post('https://api.line.me/v2/bot/message/reply',headers=headers_for_line,data=payload)
-    
+              requests.post('https://api.line.me/v2/bot/message/reply',
+                            headers=headers_for_line,
+                            data=payload)
+
             #if else, possible to be processing
             elif output_status == "processing":
               print("Entering processing")
               jsonResponse = response.json()
               fetch_status = jsonResponse['status']
-    
+
               # Keep record to check start time of processing
               image_gen_records_collection.insert_one({
                 'timestamp':
@@ -361,12 +370,15 @@ def handle_message(event):
                 'track_id':
                 output_id
               })
-    
+
               #whil loop until fetch_status <> processing
               while fetch_status == "processing":
                 #wait until 60 second, then fetch data
                 time.sleep(15)
-                payload = json.dumps({"key": my_secret4, "request_id": output_id})
+                payload = json.dumps({
+                  "key": my_secret4,
+                  "request_id": output_id
+                })
                 headers = {'Content-Type': 'application/json'}
                 #Keep response value
                 fetch_response = requests.request("POST",
@@ -377,12 +389,12 @@ def handle_message(event):
                 json_fetch_reponse = fetch_response.json()
                 fetch_status = json_fetch_reponse['status']
                 #select json portion
-            
+
               else:
                 output_fetch_url = json_fetch_reponse['output'][0]
                 #exit from while then return final result
                 reply_message = output_fetch_url + " : " + str(output_id)
-    
+
                 #exit from while then return final result
                 print("image_completed_for_user: " + lineUserId)
                 print("image_completed_for_reply_token: " + replytoken)
@@ -396,11 +408,11 @@ def handle_message(event):
                 #send result to user
                 line_bot_api.reply_message(event.reply_token,
                                            TextSendMessage(text=reply_message))
-    
+
             else:
               jsonResponse = response.json()
               reply_message_to_user(str(jsonResponse))
-    
+
             #When error send raw json from stdapi to user
           else:
             jsonResponse = response.json()
@@ -408,21 +420,17 @@ def handle_message(event):
             print("error")
             #send reply to user
             reply_message_to_user(str(jsonResponse))
-    
+
         else:
           print("Reply token not found")
-  
-  
 
-      
   elif isinstance(event.message, TextMessage):
     user_message = event.message.text
 
     # Check the user's message and set the appropriate reply message
     if user_message == "hi":
       reply_message_to_user("Good morning")
-  
-    
+
     ##############################################################################
     ###This command is to reset new value when update new function to OnemaiGPT###
     ##############################################################################
@@ -430,22 +438,33 @@ def handle_message(event):
       # Define the update criteria
       filter_criteria = {}
       # Define the update operation
-      update_operation = {'$set': {'set_pos': '-','set_neg': '-','autobeauty': True,'upload_credit':3}}
+      update_operation = {
+        '$set': {
+          'set_pos': '-',
+          'set_neg': '-',
+          'autobeauty': True,
+          'upload_credit': 3,
+          'emb_model': "-",
+        }
+      }
       # Create an UpdateMany object
       update_many = UpdateMany(filter_criteria, update_operation)
       # Execute the update operation
       result = master_users_collection.bulk_write([update_many])
       reply_message_to_user("Update success!")
 
-
     #add upload credit 20 credits
     elif user_message.startswith(my_secret11):
-      
+
       #specify user_id
       target_id = user_message.replace(my_secret11, "")
-      
-      if master_users_collection.find_one({'user_id': target_id},{"upload_credit: 1"}) is not None:
-        json_data = (master_users_collection.find_one({'user_id': target_id}, {"display_name": 1,"upload_credit": 1}))
+
+      if master_users_collection.find_one({'user_id': target_id},
+                                          {"upload_credit: 1"}) is not None:
+        json_data = (master_users_collection.find_one({'user_id': target_id}, {
+          "display_name": 1,
+          "upload_credit": 1
+        }))
         pull_user_id = target_id
         print(pull_user_id)
         pull_display_name = json_data['display_name']
@@ -454,23 +473,30 @@ def handle_message(event):
         pull_credit += 20
         print(pull_credit)
         filter = {'user_id': target_id}
-        newvalues = {"$set": {'upload_credit': pull_credit }}
+        newvalues = {"$set": {'upload_credit': pull_credit}}
         master_users_collection.update_one(filter, newvalues)
         credit_refill_collection.insert_one({
-            'user_id': target_id,
-            'display_name': pull_display_name,
-            'timestamp': timestamp,
-            'upload_credit_refill' : 20,
-            'upload_credit_refill_balance' : pull_credit
+          'user_id':
+          target_id,
+          'display_name':
+          pull_display_name,
+          'timestamp':
+          timestamp,
+          'upload_credit_refill':
+          20,
+          'upload_credit_refill_balance':
+          pull_credit
         })
-        reply_message_to_user("Add 20 upload credits to " + pull_display_name + " Success! " + "Upload_credit_balance : "+str(pull_credit))
-        
+        reply_message_to_user("Add 20 upload credits to " + pull_display_name +
+                              " Success! " + "Upload_credit_balance : " +
+                              str(pull_credit))
+
       else:
         reply_message_to_user("User not found!")
-  
+
     elif user_message == "no":
       reply_message_to_user("why")
-  
+
     elif user_message == "@autobeautyon":
       filter = {'user_id': event.source.user_id}
       newvalues = {
@@ -480,7 +506,7 @@ def handle_message(event):
       }
       master_users_collection.update_one(filter, newvalues)
       reply_message_to_user("Autobeauty was turned on, please enjoy!")
-  
+
     elif user_message == "@autobeautyoff":
       filter = {'user_id': event.source.user_id}
       newvalues = {
@@ -489,27 +515,27 @@ def handle_message(event):
         }
       }
       master_users_collection.update_one(filter, newvalues)
-      reply_message_to_user("Autobeauty was turn off, sending image will be converted to png image url.")  
-    
-    
-  
+      reply_message_to_user(
+        "Autobeauty was turn off, sending image will be converted to png image url."
+      )
+
     elif user_message.startswith('@clearchat'):
       delete_filter = {'user_id': event.source.user_id}
       result = pure_message_gpt_collection.delete_many(delete_filter)
       reply_message_to_user("All chat deleted!")
-  
+
     elif user_message.startswith('@callmopho'):
       query_condition = {
         "GPT_type_mainModel":
         "Photography"  # Modify the field and value as per your query condition
       }
-  
+
       # Query data from MongoDB based on the condition
       query_result = model_master_collection.find(query_condition)
-  
+
       # Create an empty array to store the data
       data = []
-  
+
       # Iterate over the query result and insert into the data array
       for item in query_result:
         thumbnail_image_url = item["GPT_model_image_link"]
@@ -541,7 +567,7 @@ def handle_message(event):
           }]
         }
         data.append(new_member)
-  
+
         payload = json.dumps({
           "replyToken":
           replytoken,
@@ -556,23 +582,23 @@ def handle_message(event):
             }
           }]
         })
-  
+
       requests.post('https://api.line.me/v2/bot/message/reply',
                     headers=headers_for_line,
                     data=payload)
-  
+
     elif user_message.startswith('@callmogen'):
       query_condition = {
         "GPT_type_mainModel":
         "General"  # Modify the field and value as per your query condition
       }
-  
+
       # Query data from MongoDB based on the condition
       query_result = model_master_collection.find(query_condition)
-  
+
       # Create an empty array to store the data
       data = []
-  
+
       # Iterate over the query result and insert into the data array
       for item in query_result:
         thumbnail_image_url = item["GPT_model_image_link"]
@@ -604,7 +630,7 @@ def handle_message(event):
           }]
         }
         data.append(new_member)
-  
+
         payload = json.dumps({
           "replyToken":
           replytoken,
@@ -619,23 +645,23 @@ def handle_message(event):
             }
           }]
         })
-  
+
       requests.post('https://api.line.me/v2/bot/message/reply',
                     headers=headers_for_line,
                     data=payload)
-  
+
     elif user_message.startswith('@callmocar'):
       query_condition = {
         "GPT_type_mainModel":
         "Cartoon"  # Modify the field and value as per your query condition
       }
-  
+
       # Query data from MongoDB based on the condition
       query_result = model_master_collection.find(query_condition)
-  
+
       # Create an empty array to store the data
       data = []
-  
+
       # Iterate over the query result and insert into the data array
       for item in query_result:
         thumbnail_image_url = item["GPT_model_image_link"]
@@ -667,7 +693,7 @@ def handle_message(event):
           }]
         }
         data.append(new_member)
-  
+
         payload = json.dumps({
           "replyToken":
           replytoken,
@@ -682,23 +708,23 @@ def handle_message(event):
             }
           }]
         })
-  
+
       requests.post('https://api.line.me/v2/bot/message/reply',
                     headers=headers_for_line,
                     data=payload)
-  
+
     elif user_message.startswith('@callmomsc'):
       query_condition = {
         "GPT_type_mainModel":
         "Msc."  # Modify the field and value as per your query condition
       }
-  
+
       # Query data from MongoDB based on the condition
       query_result = model_master_collection.find(query_condition)
-  
+
       # Create an empty array to store the data
       data = []
-  
+
       # Iterate over the query result and insert into the data array
       for item in query_result:
         thumbnail_image_url = item["GPT_model_image_link"]
@@ -730,7 +756,7 @@ def handle_message(event):
           }]
         }
         data.append(new_member)
-  
+
         payload = json.dumps({
           "replyToken":
           replytoken,
@@ -745,11 +771,11 @@ def handle_message(event):
             }
           }]
         })
-  
+
       requests.post('https://api.line.me/v2/bot/message/reply',
                     headers=headers_for_line,
                     data=payload)
-  
+
     elif user_message.startswith('@callmodel'):
       payload = json.dumps({
         "replyToken":
@@ -816,7 +842,7 @@ def handle_message(event):
       requests.post('https://api.line.me/v2/bot/message/reply',
                     headers=headers_for_line,
                     data=payload)
-  
+
     elif user_message.startswith('@calllora'):
       query_condition = {
         "$or": [{
@@ -825,20 +851,20 @@ def handle_message(event):
           "GPT_LoraOrEmbedding": "Embedding"
         }]
       }
-  
+
       # Query data from MongoDB based on the condition
       query_result = lora_and_emb_master_collection.find(query_condition)
-  
+
       # Create an empty array to store the data
       data = []
-  
+
       for item in query_result:
-  
+
         thumbnail_image_url = item["GPT_LoraEmbedding_Image"]
         GPT_CIVmodel_name = item["title"]
         GPT_LoraEmbedding_Name = item["GPT_LoraEmbedding_Name"]
         command_type = item["command_type"]
-  
+
         new_member = {
           "thumbnailImageUrl":
           thumbnail_image_url,
@@ -859,9 +885,9 @@ def handle_message(event):
             "text": command_type + GPT_LoraEmbedding_Name
           }]
         }
-  
+
         data.append(new_member)
-  
+
         payload = json.dumps({
           "replyToken":
           replytoken,
@@ -876,11 +902,11 @@ def handle_message(event):
             }
           }]
         })
-  
+
       requests.post('https://api.line.me/v2/bot/message/reply',
                     headers=headers_for_line,
                     data=payload)
-  
+
     elif user_message.startswith('@callcont'):
       payload = json.dumps({
         "replyToken":
@@ -954,21 +980,21 @@ def handle_message(event):
       requests.post('https://api.line.me/v2/bot/message/reply',
                     headers=headers_for_line,
                     data=payload)
-  
+
     elif user_message.startswith('@check'):
       json_data = image_gen_records_collection.find_one(
         {'track_id': int(user_message.replace("@check ", ""))}, {
           "track_id": 1,
           "json_response": 1
         })
-  
+
       if json_data is not None:
         track_id = json_data['track_id']
         json_response = json_data['json_response']
         reply_message_to_user(str(track_id) + str(json_response))
       else:
         reply_message_to_user("No record found with the specified track_id")
-  
+
     elif user_message.startswith('@curset'):
       json_data = master_users_collection.find_one(
         {'user_id': event.source.user_id}, {
@@ -977,9 +1003,9 @@ def handle_message(event):
           "lora_model": 1,
           "controlnet_model0": 1,
           "emb_model": 1,
-          "set_pos":1,
-          "set_neg":1,
-          "upload_credit":1
+          "set_pos": 1,
+          "set_neg": 1,
+          "upload_credit": 1
         })
       autobeauty = str(json_data['autobeauty'])
       main_model = json_data['main_model']
@@ -989,27 +1015,26 @@ def handle_message(event):
       pos_result = json_data['set_pos']
       neg_result = json_data['set_neg']
       upload_credit = str(json_data['upload_credit'])
-      reply_message_to_user("🤖Model : " + main_model 
-                            + "\n️🎚️lora_model : " 
-                            + lora_model + "\n🎚️emb_model :" 
-                            + emb_model +"\n️🕹️control_net :" 
-                            + controlnet_model0 +"\n️✅set_pos :" 
-                            + pos_result +"\n️🚫set_neg :" 
-                            + neg_result +"\n💋auto_beauty :"
-                           + autobeauty +"\n📤upload_credit :"
-                           + upload_credit)
+      reply_message_to_user("🤖Model : " + main_model + "\n️🎚️lora_model : " +
+                            lora_model + "\n🎚️emb_model :" + emb_model +
+                            "\n️🕹️control_net :" + controlnet_model0 +
+                            "\n️✅set_pos :" + pos_result + "\n️🚫set_neg :" +
+                            neg_result + "\n💋auto_beauty :" + autobeauty +
+                            "\n📤upload_credit :" + upload_credit)
 
     elif user_message.startswith('@payment'):
-        json_data = master_users_collection.find_one({'user_id': event.source.user_id}, {"display_name": 1})
-        display_name = json_data['display_name']
-        payment_collection.insert_one({
-            'user_id': event.source.user_id,
-            'display_name': display_name,
-            'timestamp': timestamp,
-        })
-        reply_message_to_user("Payment request was received please contact https://www.facebook.com/onemaigpt/")
-    
-  
+      json_data = master_users_collection.find_one(
+        {'user_id': event.source.user_id}, {"display_name": 1})
+      display_name = json_data['display_name']
+      payment_collection.insert_one({
+        'user_id': event.source.user_id,
+        'display_name': display_name,
+        'timestamp': timestamp,
+      })
+      reply_message_to_user(
+        "Payment request was received please contact https://www.facebook.com/onemaigpt/"
+      )
+
     elif user_message.startswith('@setmodel'):
       filter = {'user_id': event.source.user_id}
       newvalues = {
@@ -1019,7 +1044,7 @@ def handle_message(event):
       }
       master_users_collection.update_one(filter, newvalues)
       reply_message_to_user("Accept new model! : " + user_message)
-  
+
     elif user_message.startswith('@setlora'):
       filter = {'user_id': event.source.user_id}
       newvalues = {
@@ -1029,7 +1054,7 @@ def handle_message(event):
       }
       master_users_collection.update_one(filter, newvalues)
       reply_message_to_user("Accept new model! : " + user_message)
-  
+
     elif user_message.startswith('@setemb'):
       filter = {'user_id': event.source.user_id}
       newvalues = {
@@ -1039,7 +1064,7 @@ def handle_message(event):
       }
       master_users_collection.update_one(filter, newvalues)
       reply_message_to_user("Accept new model! : " + user_message)
-  
+
     elif user_message.startswith('@setcont'):
       filter = {'user_id': event.source.user_id}
       newvalues = {
@@ -1049,17 +1074,17 @@ def handle_message(event):
       }
       master_users_collection.update_one(filter, newvalues)
       reply_message_to_user("Accept new controlnet! : " + user_message)
-      
+
     elif user_message.startswith('@setpos'):
       filter = {'user_id': event.source.user_id}
       newvalues = {
         "$set": {
-          'set_pos': user_message.replace("@setpos ", "")+" ",
+          'set_pos': user_message.replace("@setpos ", "") + " ",
         }
       }
       master_users_collection.update_one(filter, newvalues)
       reply_message_to_user("Accept new setpos! : " + user_message)
-  
+
     elif user_message.startswith('@setneg'):
       filter = {'user_id': event.source.user_id}
       newvalues = {
@@ -1069,13 +1094,20 @@ def handle_message(event):
       }
       master_users_collection.update_one(filter, newvalues)
       reply_message_to_user("Accept new setneg! : " + user_message)
-  
+
     elif user_message.startswith('@clearlora_emb'):
       filter = {'user_id': event.source.user_id}
-      newvalues = {"$set": {'lora_model': "-", 'emb_model': "-", 'set_pos': "-", 'set_neg': "-"}}
+      newvalues = {
+        "$set": {
+          'lora_model': "-",
+          'emb_model': "-",
+          'set_pos': "-",
+          'set_neg': "-"
+        }
+      }
       master_users_collection.update_one(filter, newvalues)
       reply_message_to_user("Clear lora and embedding!")
-  
+
     elif user_message.startswith('@upscale'):
       payload = json.dumps({
         "key": my_secret4,
@@ -1085,16 +1117,16 @@ def handle_message(event):
       })
       headers = {'Content-Type': 'application/json'}
       response = requests.post(url_upscale, headers=headers, data=payload)
-  
+
       if response.ok:
         # check status of ok response success or processing?
         data = response.json()
         print(data)
         output_url = data['output']
         reply_message_to_user("Upscale complete! : " + output_url)
-  
+
     elif user_message.startswith('/img'):
-  
+
       #check for init_image
       if user_message.find("http") > -1:
         x = user_message.index("http")
@@ -1117,7 +1149,7 @@ def handle_message(event):
         print(controlnet_model0)
       else:
         controlnet_model0 = None
-  
+
       #check for image strength
       if user_message.find("--str") > -1:
         x = user_message.index("--str")
@@ -1129,7 +1161,7 @@ def handle_message(event):
         print(user_message)
       else:
         var_strength = float(0.3)
-  
+
       #check for sefl attention
       if user_message.find("@hf") > -1:
         var_self_attention = "yes"
@@ -1138,7 +1170,7 @@ def handle_message(event):
         user_message = x
       else:
         var_self_attention = "no"
-  
+
       #check for portrait ratio
       if user_message.find("--arp") > -1:
         var_height = 768
@@ -1147,7 +1179,7 @@ def handle_message(event):
         user_message = x
       else:
         var_height = 512
-  
+
       #check for landscape ratio
       if user_message.find("--arl") > -1:
         var_width = 768
@@ -1156,7 +1188,7 @@ def handle_message(event):
         user_message = x
       else:
         var_width = 512
-  
+
       #check for step
       if user_message.find("--step") > -1:
         #check where step begin
@@ -1171,7 +1203,7 @@ def handle_message(event):
         user_message = z
       else:
         var_num_inference_steps = 31
-  
+
       #check for seed
       if user_message.find("--seed") > -1:
         #check where step begin
@@ -1186,7 +1218,7 @@ def handle_message(event):
         user_message = z
       else:
         var_seed = 0
-  
+
       # Set main_model from master_users  to be in json payload
       json_data = (master_users_collection.find_one(
         {'user_id': event.source.user_id}, {"main_model": 1}))
@@ -1200,12 +1232,12 @@ def handle_message(event):
       # If lora in Mongo equal - this mean None for json payload
       if lora_model == "-":
         lora_model = None
-  
+
       # Set emb model
       json_data2 = (master_users_collection.find_one(
         {'user_id': event.source.user_id}, {"emb_model": 1}))
       emb_model = json_data2['emb_model']
-  
+
       # If lora in Mongo equal - this mean None for json payload
       if emb_model == "-":
         emb_model = None
@@ -1213,22 +1245,22 @@ def handle_message(event):
       # else:
       #lora_model =json_data1['lora_model']
       # check for negative prompt
-          #check set_pos
+      #check set_pos
       json_data3 = (master_users_collection.find_one(
         {'user_id': event.source.user_id}, {"set_pos": 1}))
       set_pos = json_data3['set_pos']
       # If lora in Mongo equal - this mean None for json payload
       if set_pos == "-":
-        set_pos = ""   
-  
+        set_pos = ""
+
       #check set_neg
       json_data4 = (master_users_collection.find_one(
         {'user_id': event.source.user_id}, {"set_neg": 1}))
       set_neg = json_data4['set_neg']
       # If lora in Mongo equal - this mean None for json payload
       if set_neg == "-":
-        set_neg = "" 
-  
+        set_neg = ""
+
       index = user_message.find("--no ")
       if index != -1:
         # Extract the negative prompt
@@ -1236,11 +1268,11 @@ def handle_message(event):
       else:
         # No "--no" found, set negative prompt to empty string
         negative_prompt = ""
-  
+
       # check for positive prompt
       start_index = user_message.find("/img ") + len("/img")
       end_index = user_message.find("--no ")
-  
+
       if start_index != -1:
         if end_index != -1:
           positive_prompt = user_message[start_index:end_index].strip()
@@ -1248,7 +1280,7 @@ def handle_message(event):
           positive_prompt = user_message[start_index:].strip()
       else:
         positive_prompt = None
-  
+
       if "replytoken" in session:
         replytoken = session.get("replytoken")
         # Begin parameter for payload
@@ -1278,25 +1310,25 @@ def handle_message(event):
           "multi_lingual": "no",
           "panorama": "no",
           "self_attention": var_self_attention,
-          "clip_skip":2,
+          "clip_skip": 2,
           "upscale": "no",
           "embeddings_model": emb_model,
           "scheduler": "UniPCMultistepScheduler",
           "webhook": None,
           "track_id": None,
         })
-  
+
         headers = {'Content-Type': 'application/json'}
-  
+
         response = requests.post(urlstdapi, headers=headers, data=payload)
-  
+
         if response.ok:
           # check status of ok response success or processing?
           data = response.json()
           #print(data)
           output_status = data['status']
           output_id = data.get('id')
-  
+
           # if success
           if output_status == "success":
             jsonResponse = response.json()
@@ -1319,11 +1351,11 @@ def handle_message(event):
             output_seed = jsonResponse['meta']['seed']
             output_steps = jsonResponse['meta']['steps']
             output_lora = jsonResponse['meta']['lora']
-  
+
             #found bug that cannot reply None value for lora so add "-" if lora is None
             if output_lora == None:
               output_lora = "-"
-  
+
             payload = json.dumps({
               "replyToken":
               replytoken,
@@ -1379,12 +1411,12 @@ def handle_message(event):
             requests.post('https://api.line.me/v2/bot/message/reply',
                           headers=headers_for_line,
                           data=payload)
-  
+
           #if else, possible to be processing
           elif output_status == "processing":
             jsonResponse = response.json()
             fetch_status = jsonResponse['status']
-  
+
             # Keep record to check start time of processing
             image_gen_records_collection.insert_one({
               'timestamp':
@@ -1396,13 +1428,16 @@ def handle_message(event):
               'track_id':
               output_id
             })
-  
+
             #whil loop until fetch_status <> processing
             #whil loop until fetch_status <> processing
             while fetch_status == "processing":
               #wait until 60 second, then fetch data
               time.sleep(60)
-              payload = json.dumps({"key": my_secret4, "request_id": output_id})
+              payload = json.dumps({
+                "key": my_secret4,
+                "request_id": output_id
+              })
               headers = {'Content-Type': 'application/json'}
               #Keep response value
               fetch_response = requests.request("POST",
@@ -1416,18 +1451,18 @@ def handle_message(event):
               output_fetch_url = json_fetch_reponse['output'][0]
               #exit from while then return final result
               reply_message = output_fetch_url + " : " + str(output_id)
-  
+
               #exit from while then return final result
               print("image_completed_for_user: " + lineUserId)
               print("image_completed_for_reply_token: " + replytoken)
               print("result come after processing pending")
               line_bot_api.reply_message(event.reply_token,
                                          TextSendMessage(text=reply_message))
-  
+
           else:
             jsonResponse = response.json()
             reply_message_to_user(str(jsonResponse))
-  
+
           #When error send raw json from stdapi to user
         else:
           jsonResponse = response.json()
@@ -1435,10 +1470,10 @@ def handle_message(event):
           print("error")
           #send reply to user
           reply_message_to_user(str(jsonResponse))
-  
+
       else:
         print("Reply token not found")
-  
+
     #sent other message to chatgpt
     else:
       #Record message to message_gpt
@@ -1449,33 +1484,32 @@ def handle_message(event):
         'gpt_role': "user"
       }
       pure_message_gpt_collection.insert_one(message_gpt)
-  
+
       #query user message to input chatgpt
       query_condition = {"user_id": event.source.user_id}
       query_result = pure_message_gpt_collection.find(query_condition)
-  
+
       # Create an empty array to store the data
       data = [{"role": "system", "content": "You are helpul   assistant."}]
-  
+
       for item in query_result:
         filtered_user_messages = item["message"]
         filtered_role = item["gpt_role"]
-  
+
         new_member = {"role": filtered_role, "content": filtered_user_messages}
-  
+
         data.append(new_member)
-  
+
         payload = json.dumps({
-          "model":
-          "gpt-3.5-turbo",
+          "model": "gpt-3.5-turbo",
           "messages": data,
-          "temperature":
-          0.7
+          "temperature": 0.7
         })
-  
-      response = requests.post('https://api.openai.com/v1/chat/completions',headers=headers_for_chatgpt,
-      data=payload)
-    
+
+      response = requests.post('https://api.openai.com/v1/chat/completions',
+                               headers=headers_for_chatgpt,
+                               data=payload)
+
       print(response)
       if response.ok:
         # check status of ok response success or processing?
@@ -1483,7 +1517,7 @@ def handle_message(event):
         print(gpt_reply)
         gpt_output_role = gpt_reply['choices'][0]['message']['role']
         gpt_output_content = gpt_reply['choices'][0]['message']['content']
-    
+
         #record response from gpt to mongodb
         message_gpt = {
           'user_id': event.source.user_id,
@@ -1491,54 +1525,56 @@ def handle_message(event):
           'timestamp': timestamp,
           'gpt_role': gpt_output_role
         }
-        
+
         pure_message_gpt_collection.insert_one(message_gpt)
-    
-    
-        
+
         reply_message = ("🤖OnemaiGPT : ") + gpt_output_content
-    
+
         #send reply to user
         line_bot_api.reply_message(event.reply_token,
                                    TextSendMessage(text=reply_message))
       else:
-        reply_message = "❗Error ลองพิมพ์ @clearchat เพื่อล้างประวัติการ chat ก่อนนะ! "+str(response)
-      
+        reply_message = "❗Error ลองพิมพ์ @clearchat เพื่อล้างประวัติการ chat ก่อนนะ! " + str(
+          response)
+
     # Save the message to MongoDB
     save_message(event.source.user_id, user_message)
-  
-  
+
+
 def save_message(user_id, message):
-  
+
   # Create a document with user_id, message, and timestamp fields
   message_doc = {
-      'user_id': user_id,
-      'message': message,
-      'timestamp': timestamp
-    }
-  
+    'user_id': user_id,
+    'message': message,
+    'timestamp': timestamp
+  }
+
   # Check if the user ID already exists in the master_users collection
   if master_users_collection.find_one({'user_id': user_id}) is None:
-     # Retrieve the user's display name
+    # Retrieve the user's display name
     try:
       profile = line_bot_api.get_profile(user_id)
       display_name = profile.display_name
     except LineBotApiError:
       # Handle error when user profile is not found
       display_name = "❗Unknown"
-  
+
     # Insert the user ID and display name into the master_users collection
     master_users_collection.insert_one({
-        'user_id': user_id,
-        'display_name': display_name,
-        'timestamp': timestamp,
-        'main_model': "midjourney",
-        'lora_model': "-",
-        'controlnet_model0': "-",
-        'set_pos':"-",
-        'set_neg':"-"
-      })
-  
+      'user_id': user_id,
+      'display_name': display_name,
+      'timestamp': timestamp,
+      'main_model': "midjourney",
+      'lora_model': "-",
+      'emb_model': "-",
+      'controlnet_model0': "-",
+      'set_pos': "-",
+      'set_neg': "-",
+      'autobeauty': True,
+      'upload_credit': 3
+    })
+
     # Insert the document into the messages collection
   messages_collection.insert_one(message_doc)
 
@@ -1553,22 +1589,23 @@ def reply_processing_message(reply_message):
   line_bot_api.push_message(replytoken, lineUserId,
                             TextSendMessage(text=reply_message))
 
+
 def upload_image(file_name, file):
-    try:
-        #add extension to file name before upload
-        file_name = file_name + '.png'
-      
-        # Upload the file to Amazon S3
-        s3_client.upload_fileobj(file, bucket_name, file_name)
+  try:
+    #add extension to file name before upload
+    file_name = file_name + '.png'
 
-        # Get the URL of the uploaded file
-        image_url = f'https://{bucket_name}.s3.amazonaws.com/{file_name}'
+    # Upload the file to Amazon S3
+    s3_client.upload_fileobj(file, bucket_name, file_name)
 
-        return image_url
-    except ClientError as e:
-        # Handle any errors that occur during the upload
-        print(e)
-        return "Error"
+    # Get the URL of the uploaded file
+    image_url = f'https://{bucket_name}.s3.amazonaws.com/{file_name}'
+
+    return image_url
+  except ClientError as e:
+    # Handle any errors that occur during the upload
+    print(e)
+    return "Error"
 
 
 if __name__ == '__main__':
