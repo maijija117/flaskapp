@@ -44,6 +44,7 @@ my_secret6 = os.environ['CHAT_GPT']
 my_secret7 = os.environ['aws_access_key_id']
 my_secret8 = os.environ['bucket_name']
 my_secret9 = os.environ['aws_secret_access_key']
+my_secret10 = os.environ['MASTER_RESET_KEY']
 
 headers_for_line = {
   'Content-Type': 'application/json',
@@ -95,6 +96,7 @@ image_gen_records_collection = db['image_gen_records_collection']
 model_master_collection = db["model_master"]
 lora_and_emb_master_collection = db["lora_and_emb_master"]
 pure_message_gpt_collection = db["pure_message_gpt"]
+payment_collection =db["payment"]
 
 # Get the current time in Thailand timezone
 current_time = datetime.now(timezone)
@@ -422,7 +424,7 @@ def handle_message(event):
     ##############################################################################
     ###This command is to reset new value when update new function to OnemaiGPT###
     ##############################################################################
-    elif user_message.startswith('@106472@97221'):
+    elif user_message.startswith(my_secret10):
       # Define the update criteria
       filter_criteria = {}
       # Define the update operation
@@ -964,6 +966,17 @@ def handle_message(event):
                             + neg_result +"\n💋auto_beauty :"
                            + autobeauty +"\n📤upload_credit :"
                            + upload_credit)
+
+    elif user_message.startswith('@payment'):
+        json_data = master_users_collection.find_one({'user_id': event.source.user_id}, {"display_name": 1})
+        display_name = json_data['display_name']
+        payment_collection.insert_one({
+            'user_id': event.source.user_id,
+            'display_name': display_name,
+            'timestamp': timestamp,
+        })
+        reply_message_to_user("Payment request was received please contact https://www.facebook.com/onemaigpt/")
+    
   
     elif user_message.startswith('@setmodel'):
       filter = {'user_id': event.source.user_id}
