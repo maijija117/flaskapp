@@ -33,8 +33,10 @@ url_upscale = "https://stablediffusionapi.com/api/v3/super_resolution"
 # Set the timezone to Thailand
 timezone = pytz.timezone("Asia/Bangkok")
 
-my_secret = os.environ['LINE_ACCESS_TOKEN']  #1 Check line access token  not test version
-my_secret2 = os.environ['LINE_SECRET']  #2 Check line secret key token not test version
+my_secret = os.environ[
+  'LINE_ACCESS_TOKEN']  #1 Check line access token  not test version
+my_secret2 = os.environ[
+  'LINE_SECRET']  #2 Check line secret key token not test version
 my_secret3 = os.environ['MONGO_DB_CONNECTION']
 my_secret4 = os.environ['STD_API_KEY']
 my_secret5 = os.environ['SESSION_SECRET_KEY']
@@ -443,8 +445,8 @@ def handle_message(event):
           'set_pos': '-',
           'set_neg': '-',
           'autobeauty': True,
-          'upload_credit': 3,
-          'emb_model': "-",
+          'upload_credit': 20,
+          'emb_model':"-"
         }
       }
       # Create an UpdateMany object
@@ -1141,13 +1143,15 @@ def handle_message(event):
       else:
         var_init_iamge = None
         urlstdapi = "https://stablediffusionapi.com/api/v4/dreambooth"
+
+      #check for @cont and remove from prompt!
       if user_message.find("@cont") > -1:
         urlstdapi = "https://stablediffusionapi.com/api/v5/controlnet"
-        remove_cont = user_message.replace("@cont","")
-        user_message = remove_cont
         json_data = (master_users_collection.find_one(
           {'user_id': event.source.user_id}, {"controlnet_model0": 1}))
         controlnet_model0 = json_data['controlnet_model0']
+        x = user_message.replace("@cont","")
+        user_message = x
         print(controlnet_model0)
       else:
         controlnet_model0 = None
@@ -1294,7 +1298,7 @@ def handle_message(event):
           "controlnet_model": controlnet_model0,
           "controlnet_type": controlnet_model0,
           "model_id": main_model,
-          "prompt": set_pos + positive_prompt + "sfw",
+          "prompt": set_pos + positive_prompt + " sfw",
           "negative_prompt": set_neg + negative_prompt + " nsfw",
           "width": var_width,
           "height": var_height,
@@ -1317,7 +1321,7 @@ def handle_message(event):
           "embeddings_model": emb_model,
           "scheduler": "UniPCMultistepScheduler",
           "webhook": None,
-          "track_id": None,
+          "track_id": None
         })
 
         headers = {'Content-Type': 'application/json'}
@@ -1569,12 +1573,12 @@ def save_message(user_id, message):
       'timestamp': timestamp,
       'main_model': "midjourney",
       'lora_model': "-",
-      'emb_model': "-",
       'controlnet_model0': "-",
       'set_pos': "-",
       'set_neg': "-",
-      'autobeauty': True,
-      'upload_credit': 3
+      'autobeauty' : True,
+      'emb_model' : "-",
+      'upload_creidt': 20
     })
 
     # Insert the document into the messages collection
