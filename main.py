@@ -1143,6 +1143,8 @@ def handle_message(event):
         urlstdapi = "https://stablediffusionapi.com/api/v4/dreambooth"
       if user_message.find("@cont") > -1:
         urlstdapi = "https://stablediffusionapi.com/api/v5/controlnet"
+        remove_cont = user_message.replace("@cont","")
+        user_message = remove_cont
         json_data = (master_users_collection.find_one(
           {'user_id': event.source.user_id}, {"controlnet_model0": 1}))
         controlnet_model0 = json_data['controlnet_model0']
