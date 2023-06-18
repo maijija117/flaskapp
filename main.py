@@ -45,6 +45,7 @@ my_secret7 = os.environ['aws_access_key_id']
 my_secret8 = os.environ['bucket_name']
 my_secret9 = os.environ['aws_secret_access_key']
 my_secret10 = os.environ['MASTER_RESET_KEY']
+my_secret11 = os.environ['ADD_UPLOAD_CREDIT_SECRET']
 
 headers_for_line = {
   'Content-Type': 'application/json',
@@ -97,6 +98,7 @@ model_master_collection = db["model_master"]
 lora_and_emb_master_collection = db["lora_and_emb_master"]
 pure_message_gpt_collection = db["pure_message_gpt"]
 payment_collection =db["payment"]
+credit_refill_collection = db ["credit_refill"]
 
 # Get the current time in Thailand timezone
 current_time = datetime.now(timezone)
@@ -434,7 +436,37 @@ def handle_message(event):
       # Execute the update operation
       result = master_users_collection.bulk_write([update_many])
       reply_message_to_user("Update success!")
-  
+
+
+    #add upload credit 20 credits
+    elif user_message.startswith(my_secret11):
+      
+      #specify user_id
+      target_id = user_message.replace(my_secret11, "")
+      
+      if master_users_collection.find_one({'user_id': target_id},{"upload_credit: 1"}) is not None:
+        json_data = (master_users_collection.find_one({'user_id': target_id}, {"display_name": 1,"upload_credit": 1}))
+        pull_user_id = target_id
+        print(pull_user_id)
+        pull_display_name = json_data['display_name']
+        print(pull_display_name)
+        pull_credit = json_data['upload_credit']
+        pull_credit += 20
+        print(pull_credit)
+        filter = {'user_id': target_id}
+        newvalues = {"$set": {'upload_credit': pull_credit }}
+        master_users_collection.update_one(filter, newvalues)
+        credit_refill_collection.insert_one({
+            'user_id': target_id,
+            'display_name': pull_display_name,
+            'timestamp': timestamp,
+            'upload_credit_refill' : 20,
+            'upload_credit_refill_balance' : pull_credit
+        })
+        reply_message_to_user("Add 20 upload credits to " + pull_display_name + " Success! " + "Upload_credit_balance : "+str(pull_credit))
+        
+      else:
+        reply_message_to_user("User not found!")
   
     elif user_message == "no":
       reply_message_to_user("why")
