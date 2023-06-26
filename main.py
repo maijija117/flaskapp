@@ -33,10 +33,8 @@ url_upscale = "https://stablediffusionapi.com/api/v3/super_resolution"
 # Set the timezone to Thailand
 timezone = pytz.timezone("Asia/Bangkok")
 
-my_secret = os.environ[
-  'LINE_ACCESS_TOKEN']  #1 Check line access token  not test version
-my_secret2 = os.environ[
-  'LINE_SECRET']  #2 Check line secret key token not test version
+my_secret = os.environ['Test_LINE_ACCESS_TOKEN']  #1 Check line access token  not test version
+my_secret2 = os.environ['Test_LINE_SECRET']  #2 Check line secret key token not test version
 my_secret3 = os.environ['MONGO_DB_CONNECTION']
 my_secret4 = os.environ['STD_API_KEY']
 my_secret5 = os.environ['SESSION_SECRET_KEY']
@@ -93,15 +91,17 @@ handler = WebhookHandler(my_secret2)
 client = MongoClient(my_secret3)
 
 # Specify the database and collection
-db = client['line_bot_database']  #3 Mongodb not test version
+db = client['test_line_bot_database']  #3 Mongodb not test version
 messages_collection = db['messages']
 master_users_collection = db['master_users']
 image_gen_records_collection = db['image_gen_records_collection']
 model_master_collection = db["model_master"]
 lora_and_emb_master_collection = db["lora_and_emb_master"]
 pure_message_gpt_collection = db["pure_message_gpt"]
+history_pure_message_gpt_collection = db["history_pure_message_gpt"]
 payment_collection = db["payment"]
 credit_refill_collection = db["credit_refill"]
+
 
 # Get the current time in Thailand timezone
 current_time = datetime.now(timezone)
@@ -998,6 +998,11 @@ def handle_message(event):
         reply_message_to_user("No record found with the specified track_id")
 
     elif user_message.startswith('@curset'):
+
+      #check history for reporting total token use by user #payment
+      token = history_pure_message_gpt_collection.find({'user_id': event.source.user_id})
+      total_token = sum(doc['gpt_total_tokens'] for doc in token)
+      
       json_data = master_users_collection.find_one(
         {'user_id': event.source.user_id}, {
           "autobeauty": 1,
@@ -1009,6 +1014,7 @@ def handle_message(event):
           "set_neg": 1,
           "upload_credit": 1
         })
+      
       autobeauty = str(json_data['autobeauty'])
       main_model = json_data['main_model']
       lora_model = json_data['lora_model']
@@ -1022,7 +1028,7 @@ def handle_message(event):
                             "\n️🕹️control_net :" + controlnet_model0 +
                             "\n️✅set_pos :" + pos_result + "\n️🚫set_neg :" +
                             neg_result + "\n💋auto_beauty :" + autobeauty +
-                            "\n📤upload_credit :" + upload_credit)
+                            "\n📤upload_credit :" + upload_credit + "\n🪙token_usage :" + str(total_token))
 
     elif user_message.startswith('@payment'):
       json_data = master_users_collection.find_one(
@@ -1316,7 +1322,7 @@ def handle_message(event):
           "multi_lingual": "no",
           "panorama": "no",
           "self_attention": var_self_attention,
-          "clip_skip": 2,
+          "clip_skip": 1,
           "upscale": "no",
           "embeddings_model": emb_model,
           "scheduler": "UniPCMultistepScheduler",
@@ -1490,13 +1496,14 @@ def handle_message(event):
         'gpt_role': "user"
       }
       pure_message_gpt_collection.insert_one(message_gpt)
+      print(message_gpt)
 
       #query user message to input chatgpt
       query_condition = {"user_id": event.source.user_id}
       query_result = pure_message_gpt_collection.find(query_condition)
 
       # Create an empty array to store the data
-      data = [{"role": "system", "content": "You are helpul   assistant."}]
+      data = [{"role": "system", "content": "You are helpul assistant. You are male"}]
 
       for item in query_result:
         filtered_user_messages = item["message"]
@@ -1523,13 +1530,20 @@ def handle_message(event):
         print(gpt_reply)
         gpt_output_role = gpt_reply['choices'][0]['message']['role']
         gpt_output_content = gpt_reply['choices'][0]['message']['content']
+        gpt_output_prompt_tokens = gpt_reply['usage']['prompt_tokens']
+        gpt_output_completetion_tokens = gpt_reply['usage']['completion_tokens']
+        gpt_output_total_tokens = gpt_reply['usage']['total_tokens']
 
         #record response from gpt to mongodb
         message_gpt = {
           'user_id': event.source.user_id,
           'message': gpt_output_content,
           'timestamp': timestamp,
-          'gpt_role': gpt_output_role
+          'gpt_role': gpt_output_role,
+          'gpt_prompt_token': gpt_output_prompt_tokens,
+          'gpt_completion_token' : gpt_output_completetion_tokens,
+          'gpt_total_tokens' : gpt_output_total_tokens,
+          'input_message' : user_message
         }
 
         pure_message_gpt_collection.insert_one(message_gpt)
@@ -1539,6 +1553,10 @@ def handle_message(event):
         #send reply to user
         line_bot_api.reply_message(event.reply_token,
                                    TextSendMessage(text=reply_message))
+
+        #keep chat gpt history chat for counting each user's token #payment
+        history_pure_message_gpt_collection.insert_one(message_gpt)
+        
       else:
         reply_message = "❗Error ลองพิมพ์ @clearchat เพื่อล้างประวัติการ chat ก่อนนะ! " + str(
           response)
