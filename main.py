@@ -144,8 +144,6 @@ def loop_function():
 # Create a thread for the loop function
 loop_thread = threading.Thread(target=loop_function)
 loop_thread.start()  # Start the loop thread
-
-
 ##########################################Database control##########################################
 ##########################################Database control##########################################
 ##########################################Database control##########################################
@@ -489,7 +487,8 @@ def handle_message(event):
           'set_neg': '-',
           'autobeauty': True,
           'upload_credit': 20,
-          'emb_model':"-"
+          'emb_model':"-",
+          'eco_mode': False
         }
       }
       # Create an UpdateMany object
@@ -1042,10 +1041,8 @@ def handle_message(event):
 
     elif user_message.startswith('@curset'):
 
-      #check history for reporting total token use by user #payment
-      token = history_pure_message_gpt_collection.find({'user_id': event.source.user_id})
-      total_token = sum(doc['gpt_total_tokens'] for doc in token)
-      
+
+     
       json_data = master_users_collection.find_one(
         {'user_id': event.source.user_id}, {
           "autobeauty": 1,
@@ -1055,7 +1052,8 @@ def handle_message(event):
           "emb_model": 1,
           "set_pos": 1,
           "set_neg": 1,
-          "upload_credit": 1
+          "upload_credit": 1,
+          "freetoken": 1
         })
       
       autobeauty = str(json_data['autobeauty'])
@@ -1066,12 +1064,13 @@ def handle_message(event):
       pos_result = json_data['set_pos']
       neg_result = json_data['set_neg']
       upload_credit = str(json_data['upload_credit'])
+      free_token = str(json_data['freetoken'])
       reply_message_to_user("🤖Model : " + main_model + "\n️🎚️lora_model : " +
                             lora_model + "\n🎚️emb_model :" + emb_model +
                             "\n️🕹️control_net :" + controlnet_model0 +
                             "\n️✅set_pos :" + pos_result + "\n️🚫set_neg :" +
                             neg_result + "\n💋auto_beauty :" + autobeauty +
-                            "\n📤upload_credit :" + upload_credit + "\n🪙token_usage :" + str(total_token))
+                            "\n📤upload_credit :" + upload_credit + "\n🪙freetoken_left :" + free_token)
 
     elif user_message.startswith('@payment'):
       json_data = master_users_collection.find_one(
@@ -1175,6 +1174,22 @@ def handle_message(event):
         print(data)
         output_url = data['output']
         reply_message_to_user("Upscale complete! : " + output_url)
+
+    elif user_message.startswith('@eco'):
+      json_data = (master_users_collection.find_one(
+      {'user_id': event.source.user_id}, {
+        "eco_mode": 1
+      }))
+      if json_data['eco_mode'] == False:
+        filter = {'user_id': event.source.user_id}
+        newvalues = {"$set": {'eco_mode': True}}
+        master_users_collection.update_one(filter, newvalues)
+        reply_message_to_user("Eco mode turn on!")
+      else:
+        filter = {'user_id': event.source.user_id}
+        newvalues = {"$set": {'eco_mode': False}}
+        master_users_collection.update_one(filter, newvalues)
+        reply_message_to_user("Conversation mode turn on!")
 
     elif user_message.startswith('/img'):
 
@@ -1531,83 +1546,171 @@ def handle_message(event):
 
     #sent other message to chatgpt
     else:
-      #Record message to message_gpt
-      message_gpt = {
-        'user_id': event.source.user_id,
-        'message': user_message,
-        'timestamp': timestamp,
-        'gpt_role': "user"
-      }
-      pure_message_gpt_collection.insert_one(message_gpt)
-      print(message_gpt)
+      json_data = (master_users_collection.find_one(
+      {'user_id': event.source.user_id}, {
+        "freetoken": 1,"eco_mode": 1
+      }))
+      eco_mode = json_data['eco_mode']
 
-      #query user message to input chatgpt
-      query_condition = {"user_id": event.source.user_id}
-      query_result = pure_message_gpt_collection.find(query_condition)
-
-      # Create an empty array to store the data
-      data = [{"role": "system", "content": "You are helpul assistant. You are male"}]
-
-      for item in query_result:
-        filtered_user_messages = item["message"]
-        filtered_role = item["gpt_role"]
-
-        new_member = {"role": filtered_role, "content": filtered_user_messages}
-
-        data.append(new_member)
-
-        payload = json.dumps({
-          "model": "gpt-3.5-turbo",
-          "messages": data,
-          "temperature": 0.7
-        })
-
-      response = requests.post('https://api.openai.com/v1/chat/completions',
-                               headers=headers_for_chatgpt,
-                               data=payload)
-
-      print(response)
-      if response.ok:
-        # check status of ok response success or processing?
-        gpt_reply = response.json()
-        print(gpt_reply)
-        gpt_output_role = gpt_reply['choices'][0]['message']['role']
-        gpt_output_content = gpt_reply['choices'][0]['message']['content']
-        gpt_output_prompt_tokens = gpt_reply['usage']['prompt_tokens']
-        gpt_output_completetion_tokens = gpt_reply['usage']['completion_tokens']
-        gpt_output_total_tokens = gpt_reply['usage']['total_tokens']
-
-        #record response from gpt to mongodb
-        message_gpt = {
-          'user_id': event.source.user_id,
-          'message': gpt_output_content,
-          'timestamp': timestamp,
-          'gpt_role': gpt_output_role,
-          'gpt_prompt_token': gpt_output_prompt_tokens,
-          'gpt_completion_token' : gpt_output_completetion_tokens,
-          'gpt_total_tokens' : gpt_output_total_tokens,
-          'input_message' : user_message
-        }
-
-        pure_message_gpt_collection.insert_one(message_gpt)
-
-        reply_message = ("🤖OnemaiGPT : ") + gpt_output_content
-
-        #send reply to user
-        line_bot_api.reply_message(event.reply_token,
-                                   TextSendMessage(text=reply_message))
-
-        #keep chat gpt history chat for counting each user's token #payment
-        history_pure_message_gpt_collection.insert_one(message_gpt)
+      #Check gpt mode eco or conversation? if conver->
+      if eco_mode == False:
+        #Check is credit enought to upload?
+        pull_freetoken = json_data['freetoken']
+        if pull_freetoken < 1:
+          reply_message_to_user(
+            "Free token is not enought😭, Contact admin for buying credit @ https://www.facebook.com/onemaigpt/"
+          )
+        else:
+          #Record message to message_gpt
+          message_gpt = {
+            'user_id': event.source.user_id,
+            'message': user_message,
+            'timestamp': timestamp,
+            'gpt_role': "user"
+          }
+          pure_message_gpt_collection.insert_one(message_gpt)
+          print(message_gpt)
+    
+          #query user message to input chatgpt
+          query_condition = {"user_id": event.source.user_id}
+          query_result = pure_message_gpt_collection.find(query_condition)
+    
+          # Create an empty array to store the data
+          data = [{"role": "system", "content": "You are helpul assistant. You are male"}]
+    
+          for item in query_result:
+            filtered_user_messages = item["message"]
+            filtered_role = item["gpt_role"]
+    
+            new_member = {"role": filtered_role, "content": filtered_user_messages}
+    
+            data.append(new_member)
+    
+            payload = json.dumps({
+              "model": "gpt-3.5-turbo",
+              "messages": data,
+              "temperature": 0.7
+            })
+    
+          response = requests.post('https://api.openai.com/v1/chat/completions',
+                                   headers=headers_for_chatgpt,
+                                   data=payload)
+    
+          print(response)
+          if response.ok:
+            # check status of ok response success or processing?
+            gpt_reply = response.json()
+            print(gpt_reply)
+            gpt_output_role = gpt_reply['choices'][0]['message']['role']
+            gpt_output_content = gpt_reply['choices'][0]['message']['content']
+            gpt_output_prompt_tokens = gpt_reply['usage']['prompt_tokens']
+            gpt_output_completetion_tokens = gpt_reply['usage']['completion_tokens']
+            gpt_output_total_tokens = gpt_reply['usage']['total_tokens']
+    
+            #record response from gpt to mongodb
+            message_gpt = {
+              'user_id': event.source.user_id,
+              'message': gpt_output_content,
+              'timestamp': timestamp,
+              'gpt_role': gpt_output_role,
+              'gpt_prompt_token': gpt_output_prompt_tokens,
+              'gpt_completion_token' : gpt_output_completetion_tokens,
+              'gpt_total_tokens' : gpt_output_total_tokens,
+              'input_message' : user_message
+            }
+    
+            pure_message_gpt_collection.insert_one(message_gpt)
+    
+            reply_message = ("🤖OnemaiGPT : ") + gpt_output_content
+    
+            #send reply to user
+            line_bot_api.reply_message(event.reply_token,
+                                       TextSendMessage(text=reply_message))
+  
+            #decrease freetoken after complete
+            freetoken_left = pull_freetoken - gpt_output_total_tokens
+  
+            #update freetoken left to user
+            filter = {'user_id': event.source.user_id}
+            newvalues = {"$set": {'freetoken': freetoken_left}}
+            master_users_collection.update_one(filter, newvalues)
+    
+            #keep chat gpt history chat for counting each user's token #payment
+            history_pure_message_gpt_collection.insert_one(message_gpt)
+            
+          else:
+            reply_message = "❗Error ลองพิมพ์ @clearchat เพื่อล้างประวัติการ chat ก่อนนะ! " + str(
+              response)
+    
+        # Save the message to MongoDB
+        save_message(event.source.user_id, user_message)
         
+      #Check gpt mode eco or conversation? if eco->
       else:
-        reply_message = "❗Error ลองพิมพ์ @clearchat เพื่อล้างประวัติการ chat ก่อนนะ! " + str(
-          response)
-
-    # Save the message to MongoDB
-    save_message(event.source.user_id, user_message)
-
-
+        #Check is credit enought to upload?
+        pull_freetoken = json_data['freetoken']
+        if pull_freetoken < 1:
+          reply_message_to_user(
+            "Free token is not enought😭, Contact admin for buying credit @ https://www.facebook.com/onemaigpt/"
+          )
+        else:
+          #Record message to message_gpt
+          message_gpt = {
+            'user_id': event.source.user_id,
+            'message': user_message,
+            'timestamp': timestamp,
+            'gpt_role': "user"
+          }
+          pure_message_gpt_collection.insert_one(message_gpt)
+          print(message_gpt)
+    
+    
+          payload = json.dumps({
+            "model": "text-davinci-003",
+            "prompt": user_message,
+            "max_tokens": 1000,
+            "temperature": 0.7
+            })
+    
+          response = requests.post('https://api.openai.com/v1/completions',
+                                   headers=headers_for_chatgpt,
+                                   data=payload)
+    
+          print(response)
+          if response.ok:
+            # check status of ok response success or processing?
+            gpt_reply = response.json()
+            print(gpt_reply)
+            gpt_output_text = gpt_reply['choices'][0]['text']
+            gpt_output_prompt_tokens = gpt_reply['usage']['prompt_tokens']
+            gpt_output_completetion_tokens = gpt_reply['usage']['completion_tokens']
+            gpt_output_total_tokens = gpt_reply['usage']['total_tokens']
+    
+            reply_message = ("🤖OnemaiGPT : ") + gpt_output_text
+    
+            #send reply to user
+            line_bot_api.reply_message(event.reply_token,
+                                       TextSendMessage(text=reply_message))
+  
+            #decrease freetoken after complete
+            freetoken_left = pull_freetoken - gpt_output_total_tokens
+  
+            #update freetoken left to user
+            filter = {'user_id': event.source.user_id}
+            newvalues = {"$set": {'freetoken': freetoken_left}}
+            master_users_collection.update_one(filter, newvalues)
+    
+            #keep chat gpt history chat for counting each user's token #payment
+            history_pure_message_gpt_collection.insert_one(message_gpt)
+            
+          else:
+            reply_message = "❗Error ลองพิมพ์ @clearchat เพื่อล้างประวัติการ chat ก่อนนะ! " + str(
+              response)
+    
+        # Save the message to MongoDB
+        save_message(event.source.user_id, user_message)
+        
+      
 def save_message(user_id, message):
 
   # Create a document with user_id, message, and timestamp fields
