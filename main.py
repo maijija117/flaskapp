@@ -16,6 +16,7 @@ from PIL import Image
 import os
 import boto3
 from botocore.exceptions import ClientError
+import threading
 
 ##############################################################################
 ###Warning! Please careful when deploy. Always check 4 things before deplopy###
@@ -70,6 +71,9 @@ emb_model = ''
 set_pos = ''
 set_neg = ''
 
+###variable for distribute token quota
+timecheck = ''
+
 app = Flask(__name__)
 app.config['SESSION_TYPE'] = 'filesystem'
 Session(app)
@@ -108,6 +112,45 @@ current_time = datetime.now(timezone)
 
 # Format the timestamp as a string
 timestamp = current_time.strftime('%Y-%m-%d %H:%M:%S')
+
+##########################################Database control##########################################
+##########################################Database control##########################################
+##########################################Database control##########################################
+
+#Refill free token to user every beginning of the month
+def loop_function():
+    while True:
+      print(timestamp)
+
+      if current_time.day == 1:
+        x = 20000
+        print("Today is 1 refill free token.")
+        # Continue with the next process
+        filter_criteria = {}
+        update_operation = {
+        '$set': {
+        'freetoken': x
+          }
+        }
+        # Create an UpdateMany object
+        update_many = UpdateMany(filter_criteria, update_operation)
+        # Execute the update operation
+        result = master_users_collection.bulk_write([update_many])
+
+      time.sleep(24 * 60 * 60)
+    
+
+
+# Create a thread for the loop function
+loop_thread = threading.Thread(target=loop_function)
+loop_thread.start()  # Start the loop thread
+
+
+##########################################Database control##########################################
+##########################################Database control##########################################
+##########################################Database control##########################################
+
+
 
 
 @app.route("/callback", methods=["POST"])
@@ -1607,13 +1650,6 @@ def reply_message_to_user(reply_message):
   replytoken = session.get("replytoken")
   line_bot_api.reply_message(replytoken, TextSendMessage(text=reply_message))
 
-
-def reply_processing_message(reply_message):
-  replytoken = session.get("replytoken")
-  line_bot_api.push_message(replytoken, lineUserId,
-                            TextSendMessage(text=reply_message))
-
-
 def upload_image(file_name, file):
   try:
     #add extension to file name before upload
@@ -1630,6 +1666,7 @@ def upload_image(file_name, file):
     # Handle any errors that occur during the upload
     print(e)
     return "Error"
+
 
 
 if __name__ == '__main__':
