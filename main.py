@@ -13,7 +13,6 @@ import time
 import re
 from io import BytesIO
 from PIL import Image
-import os
 import boto3
 from botocore.exceptions import ClientError
 import threading
@@ -474,6 +473,11 @@ def handle_message(event):
     if user_message == "hi":
       reply_message_to_user("Good morning")
 
+    elif user_message.startswith('@news'):
+      reply_message_to_user(
+        "🟪OnemaiGPT🟨 \nupdate:28-06-2023 \n\nรายชื่อเพื่อนๆปัจจุบันและเพื่อนที่addเราเข้ามาใหม่จะได้รับโควต้าในการใช้งาน25,000Tokenต่อเดือน \n\nเพื่อนๆสามารถเลือกโหมดประหยัดการใช้งานโดยการกดปุ่มEcoModeเพื่อเป็นการประหยัดTokenโดยจะเป็นโหมดถามคำตอบคำ(กดเมนู->กดปุ่มEcoMode🟩สีเขียวขวาล่าง) \n\nหากต้องการกลับมาใช้การสนทนาเหมือนเดิมกดปุ่มEcoModeอีกครั้งเพื่อเข้าสู่ConversationMode \n\nสอบถามรายละเอียดอื่นๆเพิ่มเติม https://www.facebook.com/onemaigpt/"
+      )
+
     ##############################################################################
     ###This command is to reset new value when update new function to OnemaiGPT###
     ##############################################################################
@@ -486,10 +490,8 @@ def handle_message(event):
           'set_pos': '-',
           'set_neg': '-',
           'autobeauty': True,
-          'upload_credit': 20,
           'emb_model':"-",
           'eco_mode': False,
-          'freetoken':25000
         }
       }
       # Create an UpdateMany object
@@ -1042,8 +1044,6 @@ def handle_message(event):
 
     elif user_message.startswith('@curset'):
 
-
-     
       json_data = master_users_collection.find_one(
         {'user_id': event.source.user_id}, {
           "autobeauty": 1,
@@ -1762,7 +1762,9 @@ def save_message(user_id, message):
       'set_neg': "-",
       'autobeauty' : True,
       'emb_model' : "-",
-      'upload_creidt': 20
+      'upload_creidt': 20,
+      'freetoken' : 25000,
+      'eco_mode' : False
     })
 
     # Insert the document into the messages collection
