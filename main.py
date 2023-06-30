@@ -16,6 +16,7 @@ from PIL import Image
 import boto3
 from botocore.exceptions import ClientError
 import threading
+from loop_function_lib import loop_function
 
 ##############################################################################
 ###Warning! Please careful when deploy. Always check 4 things before deplopy###
@@ -33,8 +34,8 @@ url_upscale = "https://stablediffusionapi.com/api/v3/super_resolution"
 # Set the timezone to Thailand
 timezone = pytz.timezone("Asia/Bangkok")
 
-my_secret = os.environ['LINE_ACCESS_TOKEN']  #1 Check line access token  not test version
-my_secret2 = os.environ['LINE_SECRET']  #2 Check line secret key token not test version
+my_secret = os.environ['Test_LINE_ACCESS_TOKEN']  #1 Check line access token  not test version
+my_secret2 = os.environ['Test_LINE_SECRET']  #2 Check line secret key token not test version
 my_secret3 = os.environ['MONGO_DB_CONNECTION']
 my_secret4 = os.environ['STD_API_KEY']
 my_secret5 = os.environ['SESSION_SECRET_KEY']
@@ -82,10 +83,9 @@ app.secret_key = my_secret5
 aws_access_key_id = my_secret7
 aws_secret_access_key = my_secret9
 bucket_name = my_secret8  # Replace with your own bucket name
-s3_client = boto3.client(
-  's3',
-  aws_access_key_id=aws_access_key_id,
-  aws_secret_access_key=aws_secret_access_key)  # Create an S3 client
+s3_client = boto3.client('s3')
+aws_access_key_id=aws_access_key_id,
+aws_secret_access_key=aws_secret_access_key  # Create an S3 client
 
 line_bot_api = LineBotApi(my_secret)
 handler = WebhookHandler(my_secret2)
@@ -94,7 +94,7 @@ handler = WebhookHandler(my_secret2)
 client = MongoClient(my_secret3)
 
 # Specify the database and collection
-db = client['line_bot_database']  #3 Mongodb not test version
+db = client['test_line_bot_database']  #3 Mongodb not test version
 messages_collection = db['messages']
 master_users_collection = db['master_users']
 image_gen_records_collection = db['image_gen_records_collection']
@@ -117,28 +117,6 @@ timestamp = current_time.strftime('%Y-%m-%d %H:%M:%S')
 ##########################################Database control##########################################
 
 #Refill free token to user every beginning of the month
-def loop_function():
-    while True:
-      print(timestamp)
-
-      if current_time.day == 1:
-        x = 20000
-        print("Today is 1 refill free token.")
-        # Continue with the next process
-        filter_criteria = {}
-        update_operation = {
-        '$set': {
-        'freetoken': x
-          }
-        }
-        # Create an UpdateMany object
-        update_many = UpdateMany(filter_criteria, update_operation)
-        # Execute the update operation
-        result = master_users_collection.bulk_write([update_many])
-
-      time.sleep(24 * 60 * 60)
-    
-
 
 # Create a thread for the loop function
 loop_thread = threading.Thread(target=loop_function)
@@ -1521,6 +1499,7 @@ def handle_message(event):
               #parse json
               json_fetch_reponse = fetch_response.json()
               fetch_status = json_fetch_reponse['status']
+              print(json_fetch_reponse)
               #select json portion
               output_fetch_url = json_fetch_reponse['output'][0]
               #exit from while then return final result
