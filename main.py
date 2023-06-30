@@ -450,7 +450,7 @@ def handle_message(event):
     # Check the user's message and set the appropriate reply message
     if user_message == "hi":
       reply_message_to_user("Good morning")
-
+      
     elif user_message.startswith('@news'):
       reply_message_to_user(
         "🟪OnemaiGPT🟨 \nupdate:28-06-2023 \n\nรายชื่อเพื่อนๆปัจจุบันและเพื่อนที่addเราเข้ามาใหม่จะได้รับโควต้าในการใช้งาน25,000Tokenต่อเดือน \n\nเพื่อนๆสามารถเลือกโหมดประหยัดการใช้งานโดยการกดปุ่มEcoModeเพื่อเป็นการประหยัดTokenโดยจะเป็นโหมดถามคำตอบคำ(กดเมนู->กดปุ่มEcoMode🟩สีเขียวขวาล่าง) \n\nหากต้องการกลับมาใช้การสนทนาเหมือนเดิมกดปุ่มEcoModeอีกครั้งเพื่อเข้าสู่ConversationMode \n\nสอบถามรายละเอียดอื่นๆเพิ่มเติม https://www.facebook.com/onemaigpt/"
@@ -465,11 +465,7 @@ def handle_message(event):
       # Define the update operation
       update_operation = {
         '$set': {
-          'set_pos': '-',
-          'set_neg': '-',
-          'autobeauty': True,
-          'emb_model':"-",
-          'eco_mode': False,
+          'paidtoken': '0',
         }
       }
       # Create an UpdateMany object
@@ -1531,8 +1527,8 @@ def handle_message(event):
         "freetoken": 1,"paidtoken": 1,"eco_mode": 1
       }))
       eco_mode = json_data['eco_mode']
-      freetoken = json_data['freetoken']
-      paidtoken = json_data['paidtoken']
+      freetoken = int(json_data['freetoken'])
+      paidtoken = int(json_data['paidtoken'])
       quotatoken = freetoken + paidtoken
 
       #Check gpt mode eco or conversation? if conver->
@@ -1613,15 +1609,15 @@ def handle_message(event):
             #update freetoken left to user
             #if user's freetoken is morethan 1, system will take free token first.
             filter = {'user_id': event.source.user_id}
-            if freetoken > 1:
-              token_left = freetoken - gpt_output_total_tokens
-              newvalues = {"$set": {'freetoken': token_left}}
+            if paidtoken > 1:
+              token_left = paidtoken - gpt_output_total_tokens
+              newvalues = {"$set": {'paidtoken': token_left}}
               master_users_collection.update_one(filter, newvalues)
               #keep chat gpt history chat for counting each user's token #payment
               history_pure_message_gpt_collection.insert_one(message_gpt)              
             else:
-              token_left = paidtoken - gpt_output_total_tokens
-              newvalues = {"$set": {'paidtoken': token_left}}
+              token_left = freetoken - gpt_output_total_tokens
+              newvalues = {"$set": {'freetoken': token_left}}
               master_users_collection.update_one(filter, newvalues)              
               #keep chat gpt history chat for counting each user's token #payment
               history_pure_message_gpt_collection.insert_one(message_gpt)
@@ -1698,15 +1694,15 @@ def handle_message(event):
             #update freetoken left to user
             #if user's freetoken is morethan 1, system will take free token first.
             filter = {'user_id': event.source.user_id}
-            if freetoken > 1:
-              token_left = freetoken - gpt_output_total_tokens
-              newvalues = {"$set": {'freetoken': token_left}}
+            if paidtoken > 1:
+              token_left = paidtoken - gpt_output_total_tokens
+              newvalues = {"$set": {'paidtoken': token_left}}
               master_users_collection.update_one(filter, newvalues)
               #keep chat gpt history chat for counting each user's token #payment
               history_pure_message_gpt_collection.insert_one(message_gpt)              
             else:
-              token_left = paidtoken - gpt_output_total_tokens
-              newvalues = {"$set": {'paidtoken': token_left}}
+              token_left = freetoken - gpt_output_total_tokens
+              newvalues = {"$set": {'freetoken': token_left}}
               master_users_collection.update_one(filter, newvalues)              
               #keep chat gpt history chat for counting each user's token #payment
               history_pure_message_gpt_collection.insert_one(message_gpt)
