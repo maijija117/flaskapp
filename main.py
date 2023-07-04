@@ -264,7 +264,7 @@ def handle_message(event):
     pull_credit = json_data['upload_credit']
     if pull_credit < 1:
       reply_message_to_user(
-        "Upload credit is not enought😭, Contact admin for more credit @ https://www.facebook.com/onemaigpt/"
+            "Free token is not enought😭, Contact admin for buying credit @ https://www.facebook.com/onemaigpt/ \n\n Quota upload รูปภาพของท่านหมดแล้วติดต่อ https://www.facebook.com/onemaigpt/ ทักแชท admin เพื่อชำระค่า credit รับการใช้งานเพิ่มเติมต่อไป"
       )
 
     #Accept for next process
@@ -1757,7 +1757,7 @@ def handle_message(event):
 
         if quotatoken < 1:
           reply_message_to_user(
-            "Free token is not enought😭, Contact admin for buying credit @ https://www.facebook.com/onemaigpt/"
+            "Free token is not enought😭, Contact admin for buying credit @ https://www.facebook.com/onemaigpt/ \n\nTokenของคุณใช้งานหมดแล้ว,หมดอายุ พิมพ์ @callpay เพื่อเลือก package ที่ต้องการชำระเงินได้ทั้งPromptpayและ Credit card VISA"
           )
         else:
           #Record message to message_gpt
@@ -1862,7 +1862,7 @@ def handle_message(event):
         #Check is credit enought to upload?
         if quotatoken < 1:
           reply_message_to_user(
-            "Free token is not enought😭, Contact admin for buying credit @ https://www.facebook.com/onemaigpt/"
+            "Free token is not enought😭, Contact admin for buying credit @ https://www.facebook.com/onemaigpt/ \n\nTokenของคุณใช้งานหมดแล้ว,หมดอายุ พิมพ์ @callpay เพื่อเลือก package ที่ต้องการชำระเงินได้ทั้งPromptpayและ Credit card VISA"
           )
         else:
           #Record message to message_gpt
