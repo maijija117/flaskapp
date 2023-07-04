@@ -1,10 +1,10 @@
-from flask import Flask, request, abort, session
+from flask import Flask, request, abort, session, jsonify
 from flask_session import Session
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError, LineBotApiError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage, StickerSendMessage, TemplateSendMessage, ButtonsTemplate, PostbackAction, MessageAction, URIAction, ImageMessage
 from pymongo import MongoClient, UpdateMany
-from datetime import datetime
+from datetime import datetime, date
 import json
 import pytz
 import os
@@ -17,6 +17,11 @@ import boto3
 from botocore.exceptions import ClientError
 import threading
 from loop_function_lib import loop_function
+from Ticket_gpt import Ticket_gpt
+import stripe
+import json
+import os
+import stripe
 
 ##############################################################################
 ###Warning! Please careful when deploy. Always check 4 things before deplopy###
@@ -34,8 +39,8 @@ url_upscale = "https://stablediffusionapi.com/api/v3/super_resolution"
 # Set the timezone to Thailand
 timezone = pytz.timezone("Asia/Bangkok")
 
-my_secret = os.environ['Test_LINE_ACCESS_TOKEN']  #1 Check line access token  not test version
-my_secret2 = os.environ['Test_LINE_SECRET']  #2 Check line secret key token not test version
+my_secret = os.environ['LINE_ACCESS_TOKEN']  #1 Check line access token  not test version
+my_secret2 = os.environ['LINE_SECRET']  #2 Check line secret key token not test version
 my_secret3 = os.environ['MONGO_DB_CONNECTION']
 my_secret4 = os.environ['STD_API_KEY']
 my_secret5 = os.environ['SESSION_SECRET_KEY']
@@ -45,6 +50,8 @@ my_secret8 = os.environ['bucket_name']
 my_secret9 = os.environ['aws_secret_access_key']
 my_secret10 = os.environ['MASTER_RESET_KEY']
 my_secret11 = os.environ['ADD_UPLOAD_CREDIT_SECRET']
+my_secret12 = os.environ['STRIPE_API_KEY']
+my_secret13 = os.environ['STRIPE_ENDPOINT_SECRET']
 
 headers_for_line = {
   'Content-Type': 'application/json',
@@ -94,7 +101,7 @@ handler = WebhookHandler(my_secret2)
 client = MongoClient(my_secret3)
 
 # Specify the database and collection
-db = client['test_line_bot_database']  #3 Mongodb not test version
+db = client['line_bot_database']  #3 Mongodb not test version
 messages_collection = db['messages']
 master_users_collection = db['master_users']
 image_gen_records_collection = db['image_gen_records_collection']
@@ -104,6 +111,14 @@ pure_message_gpt_collection = db["pure_message_gpt"]
 history_pure_message_gpt_collection = db["history_pure_message_gpt"]
 payment_collection = db["payment"]
 credit_refill_collection = db["credit_refill"]
+master_ticket_collection = db["master_ticket"]
+
+# The library needs to be configured with your account's secret key.
+# Ensure the key is kept out of any version control system you might be using.
+stripe.api_key = my_secret12
+
+# This is your Stripe CLI webhook secret for testing your endpoint locally.
+endpoint_secret = my_secret13
 
 # Get the current time in Thailand timezone
 current_time = datetime.now(timezone)
@@ -114,16 +129,13 @@ timestamp = current_time.strftime('%Y-%m-%d %H:%M:%S')
 ##########################################Database control##########################################
 ##########################################Database control##########################################
 ##########################################Database control##########################################
-
 #Refill free token to user every beginning of the month
-
 # Create a thread for the loop function
 loop_thread = threading.Thread(target=loop_function)
 loop_thread.start()  # Start the loop thread
 ##########################################Database control##########################################
 ##########################################Database control##########################################
 ##########################################Database control##########################################
-
 
 @app.route("/callback", methods=["POST"])
 def callback():
@@ -141,6 +153,86 @@ def callback():
 
   # Return a response to indicate the webhook event was successfully handled
   return "OK"
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    event = None
+    payload = request.data
+    sig_header = request.headers['STRIPE_SIGNATURE']
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, endpoint_secret
+        )
+    except ValueError as e:
+        # Invalid payload
+        raise e
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        raise e
+
+    # Handle the event
+    if event['type'] == 'checkout.session.completed':
+      session = event['data']['object']
+      userline = session["metadata"]["userline"]
+      reply_ticket = session["metadata"]["reply_token"]
+      token_points = session["metadata"]["token_points"]
+      total_paid = session["amount_total"]
+      payment_link = session["payment_link"]
+      print("This user already made a payment: "+userline+" Paid amt :" + str(total_paid/100))
+      print(session)
+      #set link to expire after payment
+      stripe.PaymentLink.modify(payment_link,active=False,)
+      
+
+      #create ticket!
+      ticket = Ticket_gpt(reply_ticket, None, None, token_points, total_paid, userline)
+      print("###TICKET_DATA###")
+      print("Tiket_no: " +ticket.ticket_no)
+      print("Issued date: " +str(ticket.issued_date))
+      print("Active date: " +str(ticket.active_date))
+      print("Expired date: " +str(ticket.expired_date))
+      print("Token_amt: " +str(ticket.token_amt))
+      print("Ticket_price: " +str((ticket.ticket_price)/100)+"THB")
+      print("Ticket_owner: " +ticket.lineuser_id)
+
+      target_id = ticket.lineuser_id
+      filter = {'user_id': target_id}
+    
+      date_object_issued = datetime.strptime(str(ticket.issued_date), "%Y-%m-%d")
+      date_object_expired = datetime.strptime(str(ticket.expired_date), "%Y-%m-%d")
+      
+      newvalues = {
+        "$set": {
+          'ticket_no': ticket.ticket_no,
+          'paidtoken' : int(ticket.token_amt),
+          'ticket_expired_date' : date_object_expired
+        }
+      }
+      master_users_collection.update_one(filter, newvalues)
+      
+      ticket_doc = {
+          'ticket_no': ticket.ticket_no,
+          'paid_token': int(ticket.token_amt),
+          'ticket_expired_date': date_object_expired,
+          'Ticket_issued_date': date_object_issued,
+          'Ticket_owner': ticket.lineuser_id
+      }
+      master_ticket_collection.insert_one(ticket_doc)
+
+    elif event['type'] == 'payment_link.created':
+      payment_link = event['data']['object']
+      userline = payment_link["metadata"]["userline"]
+      print("This user request for payment: "+userline)
+
+    elif event['type'] == 'payment_link.updated':
+      payment_link = event['data']['object']
+      print("Payment link updated!!!!")
+    # ... handle other event types
+    else:
+      print('Unhandled event type {}'.format(event['type']))
+
+    return jsonify(success=True)
 
 
 # Define a handler for the MessageEvent
@@ -452,17 +544,137 @@ def handle_message(event):
       reply_message_to_user(
         "🟪OnemaiGPT🟨 \nupdate:28-06-2023 \n\nรายชื่อเพื่อนๆปัจจุบันและเพื่อนที่addเราเข้ามาใหม่จะได้รับโควต้าในการใช้งาน25,000Tokenต่อเดือน \n\nเพื่อนๆสามารถเลือกโหมดประหยัดการใช้งานโดยการกดปุ่มEcoModeเพื่อเป็นการประหยัดTokenโดยจะเป็นโหมดถามคำตอบคำ(กดเมนู->กดปุ่มEcoMode🟩สีเขียวขวาล่าง) \n\nหากต้องการกลับมาใช้การสนทนาเหมือนเดิมกดปุ่มEcoModeอีกครั้งเพื่อเข้าสู่ConversationMode \n\nสอบถามรายละเอียดอื่นๆเพิ่มเติม https://www.facebook.com/onemaigpt/"
       )
+##############################################################################
+###This command is make payment for OnemaiGPT###
+##############################################################################
 
-    ##############################################################################
-    ###This command is to reset new value when update new function to OnemaiGPT###
-    ##############################################################################
+    elif user_message.startswith('@pay120'):
+      today = datetime.now().date()
+      json_data = (master_users_collection.find_one(
+      {'user_id': event.source.user_id}, {
+          "paidtoken": 1,
+          "ticket_expired_date": 1
+      }))
+      ticket_expired_date = json_data['ticket_expired_date']
+      paidtoken = int(json_data['paidtoken'])
+      
+      # Compare the dates
+      if ticket_expired_date == None:
+        issue_ticket(lineUserId,replytoken,12000,120000)
+      else:
+        ticket_expired_date = ticket_expired_date.strftime("%Y-%m-%dT%H:%M:%S.%f")
+        check_date = datetime.strptime(ticket_expired_date, "%Y-%m-%dT%H:%M:%S.%f").date()
+        if check_date > today:
+            if paidtoken >1 :
+              reply_message_to_user("จำนวน Token คงเหลือยังมีอยู่ ไม่สามารถเติมได้ ตรวจสอบยอดคงเหลือและวันที่หมดอายุพิมพ์ @curset สอบถามรายละเอียดทางแชท facebook www.facebook.com/onemaigpt")
+            else:
+              issue_ticket(lineUserId,replytoken,12000,120000)
+        else:
+          issue_ticket(lineUserId,replytoken,12000,120000)
+          
+    elif user_message.startswith('@pay350'):
+      today = datetime.now().date()
+      json_data = (master_users_collection.find_one(
+      {'user_id': event.source.user_id}, {
+          "paidtoken": 1,
+          "ticket_expired_date": 1
+      }))
+      ticket_expired_date = json_data['ticket_expired_date']
+      paidtoken = int(json_data['paidtoken'])
+      
+      # Compare the dates
+      if ticket_expired_date == None:
+        issue_ticket(lineUserId,replytoken,35000,400000)
+      else:
+        ticket_expired_date = ticket_expired_date.strftime("%Y-%m-%dT%H:%M:%S.%f")
+        check_date = datetime.strptime(ticket_expired_date, "%Y-%m-%dT%H:%M:%S.%f").date()
+        if check_date > today:
+            if paidtoken >1 :
+              reply_message_to_user("จำนวน Token คงเหลือยังมีอยู่ ไม่สามารถเติมได้ ตรวจสอบยอดคงเหลือและวันที่หมดอายุพิมพ์ @curset สอบถามรายละเอียดทางแชท facebook www.facebook.com/onemaigpt")
+            else:
+              issue_ticket(lineUserId,replytoken,35000,400000)
+        else:
+          issue_ticket(lineUserId,replytoken,35000,400000)
+
+    elif user_message.startswith('@pay900'):
+      today = datetime.now().date()
+      json_data = (master_users_collection.find_one(
+      {'user_id': event.source.user_id}, {
+          "paidtoken": 1,
+          "ticket_expired_date": 1
+      }))
+      ticket_expired_date = json_data['ticket_expired_date']
+      paidtoken = int(json_data['paidtoken'])
+      
+      # Compare the dates
+      if ticket_expired_date == None:
+        issue_ticket(lineUserId,replytoken,90000,1700000)
+      else:
+        ticket_expired_date = ticket_expired_date.strftime("%Y-%m-%dT%H:%M:%S.%f")
+        check_date = datetime.strptime(ticket_expired_date, "%Y-%m-%dT%H:%M:%S.%f").date()
+        if check_date > today:
+            if paidtoken >1 :
+              reply_message_to_user("จำนวน Token คงเหลือยังมีอยู่ ไม่สามารถเติมได้ ตรวจสอบยอดคงเหลือและวันที่หมดอายุพิมพ์ @curset สอบถามรายละเอียดทางแชท facebook www.facebook.com/onemaigpt")
+            else:
+              issue_ticket(lineUserId,replytoken,90000,1700000)
+        else:
+          issue_ticket(lineUserId,replytoken,90000,1700000)
+
+
+    elif user_message.startswith('@callpay'):
+      payload = json.dumps({
+        "replyToken":
+        replytoken,
+        "messages": [{
+  "type": "template",
+  "altText": "this is a image carousel template",
+  "template": {
+    "type": "image_carousel",
+    "columns": [
+      {
+        "imageUrl": "https://cdn.discordapp.com/attachments/1105338416314458219/1125680677669572679/Slide1.png",
+        "action": {
+          "type": "message",
+          "label": "120",
+          "text": "@pay120"
+        }
+      },
+      {
+        "imageUrl": "https://cdn.discordapp.com/attachments/1105338416314458219/1125680677950595073/Slide2.png",
+        "action": {
+          "type": "message",
+          "label": "350",
+          "text": "@pay350"
+        }
+      },
+      {
+        "imageUrl": "https://cdn.discordapp.com/attachments/1105338416314458219/1125680678189674537/Slide3.png",
+        "action": {
+          "type": "message",
+          "label": "900",
+          "text": "@pay900"
+        }
+      }
+    ]
+  }
+}]
+      })
+      requests.post('https://api.line.me/v2/bot/message/reply',
+                    headers=headers_for_line,
+                    data=payload)
+
+##############################################################################
+###This command is to reset new value when update new function to OnemaiGPT###
+##############################################################################
     elif user_message.startswith(my_secret10):
+  
       # Define the update criteria
       filter_criteria = {}
       # Define the update operation
       update_operation = {
         '$set': {
-          'freetoken': 25000,
+          'ticket_no': "-",
+          'ticket_expired_date':None
         }
       }
       # Create an UpdateMany object
@@ -1027,7 +1239,9 @@ def handle_message(event):
           "upload_credit": 1,
           "freetoken": 1,
           "paidtoken": 1,
-          "eco_mode": 1
+          "eco_mode": 1,
+          "ticket_no": 1,
+          "ticket_expired_date": 1
         })
 
       autobeauty = str(json_data['autobeauty'])
@@ -1041,11 +1255,17 @@ def handle_message(event):
       free_token = str(json_data['freetoken'])
       paid_token = str(json_data['paidtoken'])
       eco_mode = str(json_data['eco_mode'])
-      reply_message_to_user("💋auto_beauty :" + autobeauty +
-                            "\n📤upload_credit :" + upload_credit +
+      ticket_no = json_data['ticket_no']
+      ticket_n = ticket_no[:8]
+      ticket_expired_date = str(json_data['ticket_expired_date'])
+      ticket_expired =ticket_expired_date[:10]
+      reply_message_to_user("User_status👤" + "\n🍃Eco_mode :" + eco_mode +
                             "\n🪙freetoken_left :" + free_token +
                             "\n💳paidtoken_left :" + paid_token +
-                            "\n🍃Eco_mode :" + eco_mode)
+                            "\n🎫ticketNo. :" + ticket_n +
+                            "\n📅expired_date :" + ticket_expired +
+                            "\n💋auto_beauty :" + autobeauty +
+                            "\n📤upload_credit :" + upload_credit)
 
     elif user_message.startswith('@payment'):
       json_data = master_users_collection.find_one(
@@ -1762,7 +1982,9 @@ def save_message(user_id, message):
       'upload_creidt': 20,
       'freetoken': 25000,
       'paidtoken': 0,
-      'eco_mode': False
+      'eco_mode': True,
+      'ticket_no': "-",
+      'ticket_expired_date':"-"
     })
 
     # Insert the document into the messages collection
@@ -1791,6 +2013,32 @@ def upload_image(file_name, file):
     print(e)
     return "Error"
 
+def issue_ticket(lineUserId,reply_token,price,token_amt):
+
+  product = stripe.Product.create(name="OnemaiGPT:BasicPlan",)
+  print(product)
+  product_id = product.id
+  print("Product ID:", product_id)
+    
+  price = stripe.Price.create(unit_amount=price,currency="thb",product=product_id,)
+  print(price)
+  price_id = price.id
+          
+  link = stripe.PaymentLink.create(line_items=[
+    {"price": price_id,
+    "quantity": 1, 
+    }],
+    payment_method_types=['promptpay','card'],
+    metadata={
+      "userline":lineUserId,
+      "reply_token":reply_token,
+      "token_points":token_amt})
+  
+  print("Payment link created success.!!!")
+  url = link.url
+  print("9999999")
+  print(link)
+  reply_message_to_user("กรุณา click url ต่อไปนี้เพื่อชำระเงิน " + url + " หลังชำระเงิน สามารถพิมพ์ @curset เพื่อตรวจสอบยอดคงเหลือได้")
 
 if __name__ == '__main__':
   app.run(host='0.0.0.0', port=81)
