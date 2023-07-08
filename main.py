@@ -39,10 +39,8 @@ url_upscale = "https://stablediffusionapi.com/api/v3/super_resolution"
 # Set the timezone to Thailand
 timezone = pytz.timezone("Asia/Bangkok")
 
-my_secret = os.environ[
-  'LINE_ACCESS_TOKEN']  #1 Check line access token  not test version
-my_secret2 = os.environ[
-  'LINE_SECRET']  #2 Check line secret key token not test version
+my_secret = os.environ['LINE_ACCESS_TOKEN']  #1 Check line access token  not test version
+my_secret2 = os.environ['LINE_SECRET']  #2 Check line secret key token not test version
 my_secret3 = os.environ['MONGO_DB_CONNECTION']
 my_secret4 = os.environ['STD_API_KEY']
 my_secret5 = os.environ['SESSION_SECRET_KEY']
@@ -266,7 +264,8 @@ def handle_message(event):
     json_data = (master_users_collection.find_one(
       {'user_id': event.source.user_id}, {
         "autobeauty": 1,
-        "upload_credit": 1
+        "upload_credit": 1,
+        "image_gender": 1
       }))
 
     #Check is credit enought to upload?
@@ -279,7 +278,8 @@ def handle_message(event):
     #Accept for next process
     else:
       check_beauty = str(json_data['autobeauty'])
-
+      image_gender = json_data['image_gender']
+      
       if check_beauty == "False":
         print("ok1")
         message_id = event.message.id
@@ -333,13 +333,14 @@ def handle_message(event):
         image_url = upload_image(message_id, buffer)
 
         if "replytoken" in session:
+          print("Prepared promt for autobeauty")
           replytoken = session.get("replytoken")
           payload = json.dumps({
             "key": my_secret4,
             "controlnet_model": None,
             "controlnet_type": None,
             "model_id": "bro623jbfe32",
-            "prompt": "masterpiece portrait photography Korean girl",
+            "prompt": "masterpiece portrait photography Korean "+image_gender,
             "negative_prompt":
             "extra fingers, extra hands, extra arms, worst quality, bad quality, bad face, bad anatomy",
             "width": 512,
@@ -653,7 +654,7 @@ def handle_message(event):
             "image_carousel",
             "columns": [{
               "imageUrl":
-              "https://cdn.discordapp.com/attachments/1105338416314458219/1125680677669572679/Slide1.png",
+        "https://cdn.discordapp.com/attachments/1105338416314458219/1126677622324219944/120000_TOKENS_2.png",
               "action": {
                 "type": "message",
                 "label": "120",
@@ -661,7 +662,7 @@ def handle_message(event):
               }
             }, {
               "imageUrl":
-              "https://cdn.discordapp.com/attachments/1105338416314458219/1125680677950595073/Slide2.png",
+              "https://cdn.discordapp.com/attachments/1105338416314458219/1126677634793881610/120000_TOKENS_1.png",
               "action": {
                 "type": "message",
                 "label": "350",
@@ -669,7 +670,7 @@ def handle_message(event):
               }
             }, {
               "imageUrl":
-              "https://cdn.discordapp.com/attachments/1105338416314458219/1125680678189674537/Slide3.png",
+              "https://cdn.discordapp.com/attachments/1105338416314458219/1126677646785392650/120000_TOKENS_3.png",
               "action": {
                 "type": "message",
                 "label": "900",
@@ -694,8 +695,7 @@ def handle_message(event):
       # Define the update operation
       update_operation = {
         '$set': {
-          'ticket_no': "-",
-          'ticket_expired_date': None
+          'image_gender': "-"
         }
       }
       # Create an UpdateMany object
@@ -769,7 +769,17 @@ def handle_message(event):
       reply_message_to_user(
         "Autobeauty was turn off, sending image will be converted to png image url."
       )
-
+      
+    elif user_message.startswith('@setgender'):
+      filter = {'user_id': event.source.user_id}
+      newvalues = {
+        "$set": {
+          'image_gender': user_message.replace("@setgender ", "")
+        }
+      }
+      master_users_collection.update_one(filter, newvalues)
+      reply_message_to_user("Accept new model! : " + user_message)
+      
     elif user_message.startswith('@clearchat'):
       delete_filter = {'user_id': event.source.user_id}
       result = pure_message_gpt_collection.delete_many(delete_filter)
@@ -1263,8 +1273,9 @@ def handle_message(event):
           "eco_mode": 1,
           "ticket_no": 1,
           "ticket_expired_date": 1
+          #"image_gender": 1
         })
-
+      
       autobeauty = str(json_data['autobeauty'])
       main_model = json_data['main_model']
       lora_model = json_data['lora_model']
@@ -1280,13 +1291,16 @@ def handle_message(event):
       ticket_n = ticket_no[:8]
       ticket_expired_date = str(json_data['ticket_expired_date'])
       ticket_expired = ticket_expired_date[:10]
+      #image_gender = json_data['image_gender']
+      
       reply_message_to_user("User_status👤" + "\n🍃Eco_mode :" + eco_mode +
-                            "\n🪙freetoken_left :" + free_token +
-                            "\n💳paidtoken_left :" + paid_token +
-                            "\n🎫ticketNo. :" + ticket_n + "\n📅expired_date :" +
-                            ticket_expired + "\n💋auto_beauty :" + autobeauty +
-                            "\n📤upload_credit :" + upload_credit)
-
+                          "\n🪙freetoken_left :" + free_token +
+                          "\n💳paidtoken_left :" + paid_token +
+                          "\n🎫ticketNo. :" + ticket_n + 
+                          "\n📅expired_date :" +ticket_expired +
+                          "\n💋auto_beauty :" + autobeauty +
+                          "\n📤upload_credit :" + upload_credit)
+      
     elif user_message.startswith('@payment'):
       json_data = master_users_collection.find_one(
         {'user_id': event.source.user_id}, {"display_name": 1})
@@ -1797,7 +1811,7 @@ def handle_message(event):
           # Create an empty array to store the data
           data = [{
             "role": "system",
-            "content": "You are helpul assistant. You are male"
+            "content": "You are helpul assistant. You are male. To make your response more attractive, you always add emjoi to your response."
           }]
 
           for item in query_result:
@@ -1897,7 +1911,7 @@ def handle_message(event):
           # Create an empty array to store the data
           data = [{
             "role": "system",
-            "content": "You are helpul assistant. You are male"
+            "content": "You are helpul assistant. You are male. To make your response more attractive, you always add emjoi to your response."
           }, {
             "role": "user",
             "content": user_message
@@ -2004,7 +2018,8 @@ def save_message(user_id, message):
       'paidtoken': 0,
       'eco_mode': True,
       'ticket_no': "-",
-      'ticket_expired_date': "-"
+      'ticket_expired_date': "-",
+      'image_gender': "-"
     })
 
     # Insert the document into the messages collection
