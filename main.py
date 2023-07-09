@@ -279,7 +279,7 @@ def handle_message(event):
     else:
       check_beauty = str(json_data['autobeauty'])
       image_gender = json_data['image_gender']
-      
+
       if check_beauty == "False":
         print("ok1")
         message_id = event.message.id
@@ -313,6 +313,8 @@ def handle_message(event):
                                    TextMessage(text=image_url))
 
       else:
+        if image_gender == "-":
+          image_gender = None
         print("ok1beauty")
         message_id = event.message.id
         message_content = line_bot_api.get_message_content(message_id)
@@ -364,7 +366,7 @@ def handle_message(event):
             "embeddings_model": None,
             "scheduler": "UniPCMultistepScheduler",
             "webhook": None,
-            "track_id": None,
+            "track_id": None
           })
 
           headers = {'Content-Type': 'application/json'}
@@ -748,27 +750,20 @@ def handle_message(event):
     elif user_message == "no":
       reply_message_to_user("why")
 
-    elif user_message == "@autobeautyon":
-      filter = {'user_id': event.source.user_id}
-      newvalues = {
-        "$set": {
-          'autobeauty': True,
-        }
-      }
-      master_users_collection.update_one(filter, newvalues)
-      reply_message_to_user("Autobeauty was turned on, please enjoy!")
+    elif user_message.startswith('@autobeauty'):
+      json_data = (master_users_collection.find_one(
+        {'user_id': event.source.user_id}, {"autobeauty": 1}))
+      if json_data['autobeauty'] == False:
+        filter = {'user_id': event.source.user_id}
+        newvalues = {"$set": {'autobeauty': True}}
+        master_users_collection.update_one(filter, newvalues)
+        reply_message_to_user("Autobeauty was turned on, please enjoy!")
+      else:
+        filter = {'user_id': event.source.user_id}
+        newvalues = {"$set": {'autobeauty': False}}
+        master_users_collection.update_one(filter, newvalues)
+        reply_message_to_user("Autobeauty was turn off, sending image will be converted to png image url.")
 
-    elif user_message == "@autobeautyoff":
-      filter = {'user_id': event.source.user_id}
-      newvalues = {
-        "$set": {
-          'autobeauty': False,
-        }
-      }
-      master_users_collection.update_one(filter, newvalues)
-      reply_message_to_user(
-        "Autobeauty was turn off, sending image will be converted to png image url."
-      )
       
     elif user_message.startswith('@setgender'):
       filter = {'user_id': event.source.user_id}
@@ -853,7 +848,6 @@ def handle_message(event):
         "GPT_type_mainModel":
         "General"  # Modify the field and value as per your query condition
       }
-
       # Query data from MongoDB based on the condition
       query_result = model_master_collection.find(query_condition)
 
@@ -1039,65 +1033,83 @@ def handle_message(event):
 
     elif user_message.startswith('@callmodel'):
       payload = json.dumps({
-        "replyToken":
-        replytoken,
+        "replyToken":replytoken,
         "messages": [{
           "type": "flex",
           "altText": "Flex Message",
           "contents": {
-            "type": "bubble",
-            "size": "micro",
-            "header": {
-              "type":
-              "box",
-              "layout":
-              "vertical",
-              "contents": [{
-                "type": "text",
-                "text": "🏷️ModelType",
-                "weight": "bold",
-                "size": "18px",
-                "color": "#FFFFFF"
-              }],
-              "backgroundColor":
-              "#32CD32"
-            },
-            "hero": {
-              "type":
-              "box",
-              "layout":
-              "vertical",
-              "contents": [{
-                "type": "button",
-                "action": {
-                  "type": "message",
-                  "label": "General",
-                  "text": "@callmogen"
-                }
-              }, {
-                "type": "button",
-                "action": {
-                  "type": "message",
-                  "label": "Cartoon",
-                  "text": "@callmocar"
-                }
-              }, {
-                "type": "button",
-                "action": {
-                  "type": "message",
-                  "label": "Photography",
-                  "text": "@callmopho"
-                }
-              }, {
-                "type": "button",
-                "action": {
-                  "type": "message",
-                  "label": "Msc.",
-                  "text": "@callmomsc"
-                }
-              }]
+          "type": "bubble",
+          "size": "giga",
+          "header": {
+          "type": "box",
+          "layout": "vertical",
+          "contents": [{
+          "type": "text",
+          "text": "🏷️ModelType:เลือกประเภทรูปภาพที่ต้องการ",
+          "color": "#FFFFFF"
+          }],
+        "backgroundColor": "#a055e6"},
+        "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+        {
+        "type": "button",
+        "action": {
+        "type": "message",
+        "label": "General:ภาพทั่วไป",
+        "text": "@callmogen"
+        },
+        "style": "primary"
+        },
+        {
+        "type": "separator",
+        "margin": "md"
+        },
+        {
+        "type": "button",
+        "action": {
+          "type": "message",
+          "label": "Cartoon:ภาพการ์ตูน,อนิเมะ,คอมมิค",
+          "text": "@callmocar"
+        },
+        "style": "primary"
+        },
+        {
+        "type": "separator",
+        "margin": "md"
+        },
+        {
+        "type": "button",
+        "action": {
+          "type": "message",
+          "label": "Photography:ภาพถ่ายบุคคล",
+          "text": "@callmopho"
+        },
+        "style": "primary"
+        },
+       {
+        "type": "separator",
+        "margin": "md"
+        },
+        {
+        "type": "button",
+        "action": {
+          "type": "message",
+          "label": "Msc:แนวเฉพาะทางอื่นๆ",
+          "text": "@callmomsc"
+        },
+        "style": "primary"
             }
+          ]
+        },
+        "styles": {
+          "hero": {
+            "backgroundColor": "#f7fcfb",
+            "separator": True
           }
+        }
+      }
         }]
       })
       requests.post('https://api.line.me/v2/bot/message/reply',
@@ -1191,7 +1203,7 @@ def handle_message(event):
                 "weight": "bold"
               }],
               "backgroundColor":
-              "#32CD32"
+              "#a055e6"
             },
             "body": {
               "type":
@@ -1256,7 +1268,7 @@ def handle_message(event):
       else:
         reply_message_to_user("No record found with the specified track_id")
 
-    elif user_message.startswith('@curset'):
+    elif user_message =="@curset":
 
       json_data = master_users_collection.find_one(
         {'user_id': event.source.user_id}, {
@@ -1272,8 +1284,8 @@ def handle_message(event):
           "paidtoken": 1,
           "eco_mode": 1,
           "ticket_no": 1,
-          "ticket_expired_date": 1
-          #"image_gender": 1
+          "ticket_expired_date": 1,
+          "image_gender": 1
         })
       
       autobeauty = str(json_data['autobeauty'])
@@ -1291,15 +1303,61 @@ def handle_message(event):
       ticket_n = ticket_no[:8]
       ticket_expired_date = str(json_data['ticket_expired_date'])
       ticket_expired = ticket_expired_date[:10]
-      #image_gender = json_data['image_gender']
+      image_gender = json_data['image_gender']
       
       reply_message_to_user("User_status👤" + "\n🍃Eco_mode :" + eco_mode +
                           "\n🪙freetoken_left :" + free_token +
                           "\n💳paidtoken_left :" + paid_token +
                           "\n🎫ticketNo. :" + ticket_n + 
                           "\n📅expired_date :" +ticket_expired +
-                          "\n💋auto_beauty :" + autobeauty +
                           "\n📤upload_credit :" + upload_credit)
+    
+    elif user_message =="@curset2":
+
+      json_data = master_users_collection.find_one(
+        {'user_id': event.source.user_id}, {
+          "autobeauty": 1,
+          "main_model": 1,
+          "lora_model": 1,
+          "controlnet_model0": 1,
+          "emb_model": 1,
+          "set_pos": 1,
+          "set_neg": 1,
+          "upload_credit": 1,
+          "freetoken": 1,
+          "paidtoken": 1,
+          "eco_mode": 1,
+          "ticket_no": 1,
+          "ticket_expired_date": 1,
+          "image_gender": 1
+        })
+      
+      autobeauty = str(json_data['autobeauty'])
+      main_model = json_data['main_model']
+      lora_model = json_data['lora_model']
+      controlnet_model0 = json_data['controlnet_model0']
+      emb_model = json_data['emb_model']
+      pos_result = json_data['set_pos']
+      neg_result = json_data['set_neg']
+      upload_credit = str(json_data['upload_credit'])
+      free_token = str(json_data['freetoken'])
+      paid_token = str(json_data['paidtoken'])
+      eco_mode = str(json_data['eco_mode'])
+      ticket_no = json_data['ticket_no']
+      ticket_n = ticket_no[:8]
+      ticket_expired_date = str(json_data['ticket_expired_date'])
+      ticket_expired = ticket_expired_date[:10]
+      image_gender = json_data['image_gender']
+      
+      reply_message_to_user("🤖Model : " + main_model 
+                          + "\n️🎚️lora_model : " + lora_model 
+                          + "\n🎚️emb_model :" + emb_model 
+                          + "\n️🕹️control_net :" + controlnet_model0 
+                          + "\n️✅set_pos :" + pos_result 
+                          + "\n️🚫set_neg :" + neg_result 
+                          + "\n💋auto_beauty :" + autobeauty
+                          + "\n👨👩ImageGender :" + image_gender
+                          + "\n📤upload_credit :" + upload_credit)
       
     elif user_message.startswith('@payment'):
       json_data = master_users_collection.find_one(
@@ -1381,7 +1439,8 @@ def handle_message(event):
           'lora_model': "-",
           'emb_model': "-",
           'set_pos': "-",
-          'set_neg': "-"
+          'set_neg': "-",
+          'image_gender': "-"
         }
       }
       master_users_collection.update_one(filter, newvalues)
@@ -2068,12 +2127,12 @@ def issue_ticket(lineUserId, reply_token, price, token_amt):
     "price": price_id,
     "quantity": 1,
   }],
-                                   payment_method_types=['promptpay', 'card'],
-                                   metadata={
-                                     "userline": lineUserId,
-                                     "reply_token": reply_token,
-                                     "token_points": token_amt
-                                   })
+  payment_method_types=['promptpay', 'card'],
+  metadata={
+  "userline": lineUserId,
+  "reply_token": reply_token,
+  "token_points": token_amt
+  })
 
   print("Payment link created success.!!!")
   url = link.url
@@ -2082,7 +2141,6 @@ def issue_ticket(lineUserId, reply_token, price, token_amt):
   reply_message_to_user(
     "กรุณา click url ต่อไปนี้เพื่อชำระเงิน " + url +
     " หลังชำระเงิน สามารถพิมพ์ @curset เพื่อตรวจสอบยอดคงเหลือได้")
-
 
 if __name__ == '__main__':
   app.run(host='0.0.0.0', port=81)
