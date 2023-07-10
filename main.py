@@ -19,9 +19,6 @@ import threading
 from loop_function_lib import loop_function
 from Ticket_gpt import Ticket_gpt
 import stripe
-import json
-import os
-import stripe
 
 ##############################################################################
 ###Warning! Please careful when deploy. Always check 4 things before deplopy###
@@ -551,6 +548,128 @@ def handle_message(event):
     # Check the user's message and set the appropriate reply message
     if user_message == "hi":
       reply_message_to_user("Good morning")
+
+    elif user_message.startswith('@manual'):
+      payload = json.dumps({
+        "replyToken":
+        replytoken,
+        "messages": [{
+          "type": "flex",
+          "altText": "Flex Message",
+          "contents": {
+  "type": "bubble",
+  "size": "mega",
+  "header": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "text",
+        "text": "OnemaiGPTManual:คู่มือ(🚧อยู่ระหว่างปรับปรุง⚠️)",
+        "color": "#FFFFFF"
+      }
+    ],
+    "backgroundColor": "#a055e6"
+  },
+  "body": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "text",
+        "text": "OnemaiGPTManual:คู่มือ(🚧อยู่ระหว่างปรับปรุง⚠️)\nพิมพ์ถามเรื่องราวใดๆก็ได้ในโลกนี้ พิมพ์ข้อความแล้วส่งมาได้เลย \nสร้างรูปภาพ พิมพ์ /img ตามด้วยสิ่งที่่ต้องการให้ปรากฏบนรูปภาพเป็นภาษาอังกฤษเช่น /img a dog walking on the beach \nสอบถามรายละเอียดอื่นๆเพิ่มเติม https://www.facebook.com/onemaigpt/",
+        "wrap": True,
+        "align": "start"
+      },
+      {
+        "type": "button",
+        "action": {
+          "type": "uri",
+          "label": "OnemaiGPT Facebook",
+          "uri": "https://www.facebook.com/onemaigpt"
+        },
+        "style": "primary",
+        "color": "#a055e6"
+      }
+    ]
+  },
+  "footer": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "button",
+        "action": {
+          "type": "message",
+          "label": "แต่งหน้าสวย",
+          "text": "@tutautobeauty"
+        },
+        "style": "primary",
+        "color": "#a055e6"
+      }
+    ]
+  }
+}
+        }]
+      })
+      requests.post('https://api.line.me/v2/bot/message/reply',
+                    headers=headers_for_line,
+                    data=payload)
+
+    elif user_message.startswith('@tutautobeauty'):
+      payload = json.dumps({
+        "replyToken":
+        replytoken,
+        "messages": [{
+          "type": "flex",
+          "altText": "Flex Message",
+          "contents": {
+  "type": "bubble",
+  "size": "mega",
+  "header": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "text",
+        "text": "OnemaiGPTManual:คู่มือแต่งหน้าสวยKorean look",
+        "color": "#FFFFFF"
+      }
+    ],
+    "backgroundColor": "#a055e6"
+  },
+  "body": {
+    "type": "box",
+    "layout": "vertical",
+    "contents": [
+      {
+        "type": "text",
+        "text": "🟪OnemaiGPT🟨\n\nสร้างรูปภาพแต่งหน้าสวย style Korean guy, Korean girl แค่ส่งรูปเพื่อนๆมาให้OnemaiGPT \n\n เพื่อนๆส่งรูปภาพเพื่อนๆมายัง Line OnemaiGPT แนะนำให้ใช้รูปภาพที่เห็นใบหน้าชัดเจน เช่นใบหน้าเต็มรูปภาพ หรือภาพครึ่งตัว\n\n เพื่อให้ OnemaiGPTสร้างรูปภาพที่ใกล้เคียงกับเพื่อนๆมากที่สุด กรุณาระบุรูปแบบเพศที่ต้องการให้ปรากฏบนรูปภาพด้วยคำสั่ง @setgender ตามด้วยรูปแบบที่ต้องการเช่น @setgender guy หรือ @setgender girlเมื่อระบบตอบกลับแล้ว สามารถส่งรูปภาพเข้ามาได้ทันที ขอให้ทุกท่านสนุกกับ OnemaiGPT ครับ",
+        "wrap": True,
+        "align": "start"
+      },
+      {
+        "type": "image",
+        "url": "https://cdn.discordapp.com/attachments/1105338416314458219/1127635871013797898/IMG_3606.png",
+        "size": "full",
+        "offsetTop": "none",
+        "offsetBottom": "xxl",
+        "offsetStart": "none",
+        "offsetEnd": "xxl"
+      },
+      {
+        "type": "text",
+        "text": "คำสั่ง @setgender สามารถใช้เปลี่ยนเพศได้ไม่จำกัด",
+        "wrap": True
+      }
+    ]
+  }
+}
+        }]
+      })
+      requests.post('https://api.line.me/v2/bot/message/reply',
+                    headers=headers_for_line,
+                    data=payload)
 
     elif user_message.startswith('@news'):
       reply_message_to_user(
@@ -1681,6 +1800,7 @@ def handle_message(event):
         if response.ok:
           # check status of ok response success or processing?
           data = response.json()
+          print(data)
           #print(data)
           output_status = data['status']
           output_id = data.get('id')
@@ -2140,7 +2260,7 @@ def issue_ticket(lineUserId, reply_token, price, token_amt):
   print(link)
   reply_message_to_user(
     "กรุณา click url ต่อไปนี้เพื่อชำระเงิน " + url +
-    " หลังชำระเงิน สามารถพิมพ์ @curset เพื่อตรวจสอบยอดคงเหลือได้")
+    " หลังชำระเงิน สามารถพิมพ์ @curset เพื่อตรวจสอบยอดคงเหลือได้")  
 
 if __name__ == '__main__':
   app.run(host='0.0.0.0', port=81)
